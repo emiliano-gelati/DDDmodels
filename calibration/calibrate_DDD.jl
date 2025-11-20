@@ -1,6 +1,3 @@
-#Runs DDD model either in single run model or for calibration
-#The model itself is called as a function which calls on several functions
-#This one is for ECCO use not MRT and not operative or HSO
 using CSV
 using Distributions
 using LsqFit
@@ -11,10 +8,9 @@ using Plots
 using BlackBoxOptim
 using JLD2
 
-# Preprocessing routines
 path_dddfun = joinpath(dirname(@__DIR__), "DDDFunctions")
+# Preprocessing routines
 include(joinpath(path_dddfun, "Big2SmallLambda.jl"))
-#include(joinpath(path_dddfun, "CeleritySubSurface_DupBous.jl"))
 include(joinpath(path_dddfun, "CeleritySubSurface.jl"))
 include(joinpath(path_dddfun, "SingleUH.jl"))
 include(joinpath(path_dddfun, "SingleNormalUH.jl"))
@@ -23,8 +19,7 @@ include(joinpath(path_dddfun, "PyrAreas.jl"))
 include(joinpath(path_dddfun, "GrWPoint.jl"))
 include(joinpath(path_dddfun, "RiverPoint.jl"))
 include(joinpath(path_dddfun, "TemperatureVector.jl"))
-
-##EB and Snow Routines
+# EB and Snow Routines
 include(joinpath(path_dddfun, "NedbEBGlac_debug04072022.jl"))
 include(joinpath(path_dddfun, "SnowpackTemp.jl"))
 include(joinpath(path_dddfun, "TempstartUpdate.jl"))
@@ -41,8 +36,7 @@ include(joinpath(path_dddfun, "Varc.jl"))
 include(joinpath(path_dddfun, "NewSnowDensityEB.jl"))
 include(joinpath(path_dddfun, "NewSnowSDEB.jl"))
 include(joinpath(path_dddfun, "DensityAge.jl"))
-
-#Subsurface and Evaporation routines
+# Subsurface and Evaporation routines
 include(joinpath(path_dddfun, "LayerCapacityUpdate.jl"))
 include(joinpath(path_dddfun, "PotentialEvapPT.jl"))
 include(joinpath(path_dddfun, "UnsaturatedEvapEB.jl"))
@@ -54,15 +48,13 @@ include(joinpath(path_dddfun, "OFICap.jl"))
 include(joinpath(path_dddfun, "LayerUpdate.jl"))
 include(joinpath(path_dddfun, "BogLayerUpdate.jl"))
 include(joinpath(path_dddfun, "RiverUpdate.jl"))
-## Overland Flow routine
+# Overland Flow routine
 include(joinpath(path_dddfun, "OverlandFlowDynamicDD.jl"))
-## Efficiency criteria
+# Efficiency criteria
 include(joinpath(path_dddfun, "NSE_ths.jl"))
 include(joinpath(path_dddfun, "KGE_ths.jl"))
 # Model Module
-#include(joinpath(path_dddfun, "DDDUrbanFunc.jl"))
-include(joinpath(path_dddfun, "DDDAllTerrain22012024.jl")) #This one for ECCO use not MRT
-########################################################################################
+include(joinpath(path_dddfun, "DDDAllTerrain22012024.jl"))
 
 # Functions
 function calib_wrapper_model(Gpar,startsim, tprm, prm, ptqfile, utfile, r2fil, modstate, savestate, kal, spinup)
@@ -78,23 +70,22 @@ function calib_single_wsh(Gpar,startsim, tprm, prm, ptqfile, utfile, r2fil, mods
 end
 
 # Temporary data folders
-dir_input = "/hdata/grid/DDD_test/inndataV2"
-dir_param = "/hdata/grid/DDD_test/DDDurbanParameters"
-root_output = "/hdata/grid/DDD_test/output"
+dir_input = "/hdata/hmdata01/DDD_calibration/inndataV2"
+dir_param = "/hdata/hmdata01/DDD_calibration/BestPrimo2025"
+root_output = "/hdata/hmdata01/DDD_calibration/output"
 
 # Options
 catchment = "55.4"  # stationnumber
-dir_output = mkpath(joinpath(root_output, catchment))
 startsim = 1 
-kal = 1
+kal = 0
 modstate = 0
 savestate = 0
-spinup = (31*4) #days used to spin up the model. 
-resolution_time = "3h"         # this is just a marker for naming files, does NOT set the temporal resolution
-ptqfile = joinpath(dir_input, catchment, string(catchment, "_" , resolution_time, "_ptq_DDDv2_kal.csv"))
-paramfile = joinpath(dir_param, catchment, string("ParDDDv2_", catchment, "_3h.csv"))
-r2fil = joinpath(dir_output, string("r2_", resolution_time, ".csv"))
-utfile = joinpath(dir_output, string("simres_", resolution_time, ".csv"))
+spinup = 365 #days used to spin up the model
+ptqfile = joinpath(dir_input, catchment, string(catchment, "_3h_ptq_SN2018_2209_kal.csv"))
+paramfile = joinpath(dir_param, string("Best_par_", catchment, "_3h_DDDv2.csv"))
+dir_output = mkpath(joinpath(root_output, catchment))
+r2fil = joinpath(dir_output, "r2_3h.csv")
+utfile = joinpath(dir_output, "simres_3h.csv")
 
 # Read parameter file
 prm = CSV.read(paramfile, DataFrame, header=["Name", "val"], delim=';')
@@ -105,20 +96,17 @@ tprm = [prm.val[20], prm.val[21], prm.val[22], prm.val[18], prm.val[19],prm.val[
 println(tprm)
 Gshape, Gscale = Big2SmallLambda(prm.val[32], prm.val[33]) # Coverting integrated celerity to layers takes too long in calibration: preprocessing
 Gpar = [Gshape, Gscale]
-println(prm.val[32]," ", prm.val[33])
-
 
 # Run or calibrate model
 t1 = time()
-if(kal == 0)
+if kal == 0 # run
     qobs,qberegn,KGE,NSE, bias = calib_wrapper_model(Gpar,startsim, tprm, prm, ptqfile, utfile, r2fil,
         modstate, savestate,kal, spinup) # a single run 
     println(catchment)
     println("KGE=",round(KGE,digits=3))
     println("NSE=",round(NSE,digits=3))
     println("bias=",round(bias,digits=3))
-end
-if(kal == 1) # calibrate
+elseif kal == 1 # calibrate
     #                   u,        pro,         TX,        Pkorr,    skorr,          GscInt,         OVP     OVIP 
     param_range = [(1.0,3.0), (0.05,0.05), (-0.5, 0.5), (0.5, 2.0), (0.5,2.0), (0.065,0.075), (tprm[7],tprm[7]),
         (tprm[8],tprm[8]), (tprm[9],tprm[9]),(tprm[10],tprm[10])] # 
