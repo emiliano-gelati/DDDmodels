@@ -1,0 +1,14 @@
+name = "251120"
+spinup = 365 # days
+
+[periods]
+calibration = "kal"
+[periods.other]
+  validation = "val"
+  test = "test"
+
+[path]
+catchments = "settings/catchments/catchments_251120.txt"
+parameter_ranges = "settings/parameter_ranges/parameter_ranges_251120.csv"
+ptq = "/hdata/hmdata01/DDD_calibration/inndataV2/$catchment/$(catchment)_3h_ptq_SN2018_2209_$(period).csv"
+output = "/hdata/hmdata01/DDD_calibration/output_251120/"

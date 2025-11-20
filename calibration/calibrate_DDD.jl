@@ -84,8 +84,8 @@ spinup = 365 #days used to spin up the model
 ptqfile = joinpath(dir_input, catchment, string(catchment, "_3h_ptq_SN2018_2209_kal.csv"))
 paramfile = joinpath(dir_param, string("Best_par_", catchment, "_3h_DDDv2.csv"))
 dir_output = mkpath(joinpath(root_output, catchment))
-r2fil = joinpath(dir_output, "r2_3h.csv")
-utfile = joinpath(dir_output, "simres_3h.csv")
+r2fil = joinpath(dir_output, string(catchment, "_r2_3h.csv"))
+utfile = joinpath(dir_output, string(catchment, "_simres_3h.csv"))
 
 # Read parameter file
 prm = CSV.read(paramfile, DataFrame, header=["Name", "val"], delim=';')
