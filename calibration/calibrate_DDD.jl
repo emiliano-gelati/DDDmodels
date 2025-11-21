@@ -1,3 +1,5 @@
+using Infiltrator
+using TOML
 using CSV
 using Distributions
 using LsqFit
@@ -55,6 +57,22 @@ include(joinpath(path_dddfun, "NSE_ths.jl"))
 include(joinpath(path_dddfun, "KGE_ths.jl"))
 # Model Module
 include(joinpath(path_dddfun, "DDDAllTerrain22012024.jl"))
+
+# Load settings from file
+settings = TOML.parsefile(ARGS[1])
+settings["periods"] = convert(Dict{String,String}, settings["periods"])
+settings["path"] = convert(Dict{String,String}, settings["path"])
+# Load catchment list
+catchments = readlines(settings["path"]["catchments"])
+filter!(line -> !isempty(strip(line)) && !startswith(strip(line), "#"), catchments)
+# Load parameter ranges
+parameter_ranges = CSV.read(settings["path"]["parameter_ranges"], DataFrame, header=[1, 2])
+cols_int = names(parameter_ranges, Int)
+parameter_ranges[!, cols_int] = Float64.(parameter_ranges[!, cols_int])
+# Create output folders
+@infiltrate
+exit()
+
 
 # Functions
 function calib_wrapper_model(Gpar,startsim, tprm, prm, ptqfile, utfile, r2fil, modstate, savestate, kal, spinup)
