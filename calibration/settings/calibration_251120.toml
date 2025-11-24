@@ -8,6 +8,6 @@ test = "test"
 
 [path]
 catchments = "settings/catchments/catchments_251120.txt"
-parameter_ranges = "settings/parameter_ranges/parameter_ranges_251120.csv"
+parameter_ranges = "settings/parameter_ranges/parameter_ranges_251120.toml"
 ptq = "/hdata/hmdata01/DDD_calibration/inndataV2/{CATCHMENT}/{CATCHMENT}_3h_ptq_SN2018_2209_{PERIOD}.csv"
 output = "/hdata/hmdata01/DDD_calibration/output_251120/"

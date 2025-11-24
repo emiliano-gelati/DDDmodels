@@ -66,11 +66,11 @@ settings["path"] = convert(Dict{String,String}, settings["path"])
 catchments = readlines(settings["path"]["catchments"])
 filter!(line -> !isempty(strip(line)) && !startswith(strip(line), "#"), catchments)
 # Load parameter ranges
-parameter_ranges = CSV.read(settings["path"]["parameter_ranges"], DataFrame, header=[1, 2])
-cols_int = names(parameter_ranges, Int)
-parameter_ranges[!, cols_int] = Float64.(parameter_ranges[!, cols_int])
+raw = TOML.parsefile(settings["path"]["parameter_ranges"])
+parameter_ranges = Dict(k => DataFrame(convert(Dict{String,Vector{Float64}}, d)) for (k, d) in raw)
 # Create output folders
 @infiltrate
+settings["path"]["output"]
 exit()
 
 
