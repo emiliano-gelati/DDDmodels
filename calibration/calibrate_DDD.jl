@@ -58,6 +58,28 @@ include(joinpath(path_dddfun, "KGE_ths.jl"))
 # Model Module
 include(joinpath(path_dddfun, "DDDAllTerrain22012024.jl"))
 
+#function makeEvaluator(parameters_initial::Vector{Float64}, path_ptq::String, spinup::Int)
+#    return let
+#        parameters_initial = parameters_initial,
+#        path_ptq = path_ptq,
+#        spinup = spinup
+#        function wrapper(x::Vector{Float64})
+#            return DDDAllTerrain(1, x, parameters_initial, path_ptq, "", "", 0, 0, 1, spinup)[3]
+#        end
+#    end
+#end
+
+function makeEvaluator(parameters_initial::DataFrame, path_ptq::String, spinup::Int)
+    function wrapper(x::Vector{Float64})
+        score_kge = DDDAllTerrain(1, x, parameters_initial, path_ptq, "", "", 0, 0, 1, spinup)[3]
+        return 1 - score_kge
+    end
+    return wrapper
+end
+
+
+num_threads = max(Threads.nthreads() - 1, 1)
+order_parameters = ["u", "pro", "TX", "Pkorr", "skorr", "GscInt", "OVP", "OVIP", "Lv", "rv"]
 # Load settings from file
 settings = TOML.parsefile(ARGS[1])
 settings["periods"] = convert(Dict{String,String}, settings["periods"])
@@ -68,72 +90,19 @@ filter!(line -> !isempty(strip(line)) && !startswith(strip(line), "#"), catchmen
 # Load parameter ranges
 raw = TOML.parsefile(settings["path"]["parameter_ranges"])
 parameter_ranges = Dict(k => DataFrame(convert(Dict{String,Vector{Float64}}, d)) for (k, d) in raw)
-# Create output folders
-@infiltrate
-settings["path"]["output"]
-exit()
-
-
-# Functions
-function calib_wrapper_model(Gpar,startsim, tprm, prm, ptqfile, utfile, r2fil, modstate, savestate, kal, spinup)
- qobs, qberegn, KGE, NSE, bias = DDDAllTerrain(Gpar,startsim, tprm, prm, ptqfile, utfile, r2fil, modstate, savestate,
-        kal, spinup)  
- return qobs,qberegn, KGE,NSE,bias 
-end
-
-function calib_single_wsh(Gpar,startsim, tprm, prm, ptqfile, utfile, r2fil, modstate, savestate, kal, spinup)
- qobs, qberegn, KGE, NSE, bias = DDDAllTerrain(Gpar,startsim, tprm, prm, ptqfile, utfile, r2fil, modstate, savestate,
-        kal, spinup)    
- return (1.0 - KGE)
-end
-
-# Temporary data folders
-dir_input = "/hdata/hmdata01/DDD_calibration/inndataV2"
-dir_param = "/hdata/hmdata01/DDD_calibration/BestPrimo2025"
-root_output = "/hdata/hmdata01/DDD_calibration/output"
-
-# Options
-catchment = "55.4"  # stationnumber
-startsim = 1 
-kal = 0
-modstate = 0
-savestate = 0
-spinup = 365 #days used to spin up the model
-ptqfile = joinpath(dir_input, catchment, string(catchment, "_3h_ptq_SN2018_2209_kal.csv"))
-paramfile = joinpath(dir_param, string("Best_par_", catchment, "_3h_DDDv2.csv"))
-dir_output = mkpath(joinpath(root_output, catchment))
-r2fil = joinpath(dir_output, string(catchment, "_r2_3h.csv"))
-utfile = joinpath(dir_output, string(catchment, "_simres_3h.csv"))
-
-# Read parameter file
-prm = CSV.read(paramfile, DataFrame, header=["Name", "val"], delim=';')
-#            u,          pro           TX,         Pkorr        skorr,     GscInt      OVP          
-#         OVIP       Lv            rv        
-tprm = [prm.val[20], prm.val[21], prm.val[22], prm.val[18], prm.val[19],prm.val[33], prm.val[34], 
-        prm.val[35],prm.val[36],prm.val[37]]
-println(tprm)
-Gshape, Gscale = Big2SmallLambda(prm.val[32], prm.val[33]) # Coverting integrated celerity to layers takes too long in calibration: preprocessing
-Gpar = [Gshape, Gscale]
-
-# Run or calibrate model
-t1 = time()
-if kal == 0 # run
-    qobs,qberegn,KGE,NSE, bias = calib_wrapper_model(Gpar,startsim, tprm, prm, ptqfile, utfile, r2fil,
-        modstate, savestate,kal, spinup) # a single run 
-    println(catchment)
-    println("KGE=",round(KGE,digits=3))
-    println("NSE=",round(NSE,digits=3))
-    println("bias=",round(bias,digits=3))
-elseif kal == 1 # calibrate
-    #                   u,        pro,         TX,        Pkorr,    skorr,          GscInt,         OVP     OVIP 
-    param_range = [(1.0,3.0), (0.05,0.05), (-0.5, 0.5), (0.5, 2.0), (0.5,2.0), (0.065,0.075), (tprm[7],tprm[7]),
-        (tprm[8],tprm[8]), (tprm[9],tprm[9]),(tprm[10],tprm[10])] # 
-    println(param_range)
-    calib_single_wsh_tmp(param) = calib_single_wsh(Gpar,startsim, param, prm, ptqfile, utfile, r2fil,
-                                           modstate, savestate, kal, spinup)
-    res = bboptimize(calib_single_wsh_tmp; SearchRange = param_range, MaxSteps = 1000, TraceMode = :verbose, NThreads=Threads.nthreads()-1)
+# Loop through catchments
+for id in catchments
+    if haskey(parameter_ranges, id)
+        error("Not implemented yet: parameter ranges for individual catchments")
+    else
+        bounds = [Tuple(parameter_ranges["default"][:,k]) for k in order_parameters]
+    end
+    path_ptq = replace(settings["path"]["ptq"], "{CATCHMENT}" => id, "{PERIOD}" => settings["periods"]["calibration"])
+    parameters_initial = CSV.read(replace(settings["path"]["parameters_initial"], "{CATCHMENT}" => id),
+                                  DataFrame, header=["Name", "val"], delim=';')
+    evaluator = makeEvaluator(parameters_initial, path_ptq, settings["spinup"])
+    res = bboptimize(evaluator; SearchRange=bounds, MaxSteps=1000, TraceMode=:verbose, NThreads=num_threads)
     param_hydro = best_candidate(res)
-    println(param_hydro)
+    dir_out = mkpath(joinpath(settings["path"]["output"], id))
+    exit()
 end
-println("Pkorr = ", round(tprm[4], digits=3))
-println("Time elapsed = ", time() - t1, " seconds")

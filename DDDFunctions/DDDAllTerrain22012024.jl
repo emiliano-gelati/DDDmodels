@@ -28,7 +28,7 @@
 #                 starting from saved state variables
 #----------------------------------------------------------------------------------
 
-function DDDAllTerrain(Gpar, startsim, tprm, prm ,ptqfile,utfile,r2fil, modstate,savestate, kal, spinuptime)
+function DDDAllTerrain(startsim, tprm, prm ,ptqfile,utfile,r2fil, modstate,savestate, kal, spinuptime)
 
 
 DDA = 6  # number of landscape types with distance distribution
@@ -224,8 +224,11 @@ days = Int(length(ptqinn.yr))    # Length of timeseries
 MAD2 = exp(-4.59 + 1.135*log(meandailyP)+0.97*log(totarea/1000000)-0.0603*meandailyT + 0.053*log(snfjell)-0.00014*hfelt[5])  # R2 = 0.99, Area in km2, Snfjell in fraction   
 if (Ltyfrac[5] > 0.05 ) #Fraction of glaciers
      MAD = MAD2    # needs to adjust MAD if glaciers are present since MAD is used to estimate the groundwater reservoir
-end 
-println("Mad= ", MAD)
+end
+
+if kal == 0
+    println("Mad= ", MAD)
+end
 
 #Constants
 hson = 10                               # Elevation zones
@@ -867,9 +870,11 @@ end
   #---------------------------------------------------------------------------------------------------
 
 end # end of loop for number of timesteps in timeseries
- 
-println("nodaysLake=",nodaysLake)
-println("nodaysRiver=",nodaysRiv)
+
+if kal == 0
+    println("nodaysLake=",nodaysLake)
+    println("nodaysRiver=",nodaysRiv)
+end
 
  skillstart = Int(spinuptime*(86400/Timeresinsec))
  days2 = days
@@ -885,18 +890,16 @@ wwater = 1.0*persons*(140.0 + 42.0)/(86400.0*1000.0)# norsk vann equivalent use 
  bias = beta #(meansim/meanobs)
 #bias = (meansim/meanobs) 
 
-#Recall, tprm is the parameter vector
-#                                       u,        pro,        TX,      PCritFlux,         OFP,        GshInt,   GscInt, persons
-dfy = DataFrame(A=NSE,B=KGE,C=bias,D=tprm[1],E=tprm[2],F=tprm[3],G=tprm[4], H=tprm[5], II =tprm[6],IJ=tprm[7],
-    JJ=tprm[8], KJ= tprm[9], LJ= tprm[10])
-CSV.write(r2fil,DataFrame(dfy), delim = ';', header=false, append = true)
-
-
-toptitles = ["Yr","Mnt","Day", "Hr","Min","Precip","Temp","Qobs","Qsim","Q_P","Q_IP","Q_Bogs","SCA_P","SWE_P","SS+_P", "SS+_IP","SSDef_P","SSDef_IP",
-        "SM_P","SM_IP","Ea_P","Ea_IP","Qmm","SMBog","EaBog","qmm_state","Boglyrs","SCA_IP", "SWE_IP","WCS_P", "WCS_IP","SS_P", "SS_IP",
-        "Q_OF", "outglac", "r_sm_outglac", "gisoil", "misoil","snittT[1]"]
-
- if (kal==0)
+ if kal == 0
+  # tprm is the parameter vector (u, pro, TX, PCritFlux, OFP, GshInt, GscInt, persons
+  dfy = DataFrame(A=NSE,B=KGE,C=bias,D=tprm[1],E=tprm[2],F=tprm[3],G=tprm[4], H=tprm[5], II =tprm[6],IJ=tprm[7],
+      JJ=tprm[8], KJ= tprm[9], LJ= tprm[10])
+  CSV.write(r2fil,DataFrame(dfy), delim = ';', header=false, append = true)
+  
+  
+  toptitles = ["Yr","Mnt","Day", "Hr","Min","Precip","Temp","Qobs","Qsim","Q_P","Q_IP","Q_Bogs","SCA_P","SWE_P","SS+_P", "SS+_IP","SSDef_P","SSDef_IP",
+          "SM_P","SM_IP","Ea_P","Ea_IP","Qmm","SMBog","EaBog","qmm_state","Boglyrs","SCA_IP", "SWE_IP","WCS_P", "WCS_IP","SS_P", "SS_IP",
+          "Q_OF", "outglac", "r_sm_outglac", "gisoil", "misoil","snittT[1]"]
   CSV.write(utfile,DataFrame(simresult,:auto), delim = ';', header=toptitles)                
   println("M= ", round(M[1],digits=2)," ",round(M[2],digits =2))
   println("k_P= ", round(k[1,1],digits=6)," ",round(k[1,2],digits=6)," ",round(k[1,3],digits=6)," ",round(k[1,4],digits=6)," ",round(k[1,5],digits=6))
