@@ -1,78 +1,14 @@
 using Infiltrator
 using TOML
 using CSV
-using Distributions
-using LsqFit
-using Statistics
-using Dates
 using DataFrames
-using Plots
 using BlackBoxOptim
-using JLD2
+include(joinpath(dirname(@__DIR__), "DDDFunctions", "DDDAllTerrain22012024.jl"))
 
-path_dddfun = joinpath(dirname(@__DIR__), "DDDFunctions")
-# Preprocessing routines
-include(joinpath(path_dddfun, "Big2SmallLambda.jl"))
-include(joinpath(path_dddfun, "CeleritySubSurface.jl"))
-include(joinpath(path_dddfun, "SingleUH.jl"))
-include(joinpath(path_dddfun, "SingleNormalUH.jl"))
-include(joinpath(path_dddfun, "LayerEstimation.jl"))
-include(joinpath(path_dddfun, "PyrAreas.jl"))
-include(joinpath(path_dddfun, "GrWPoint.jl"))
-include(joinpath(path_dddfun, "RiverPoint.jl"))
-include(joinpath(path_dddfun, "TemperatureVector.jl"))
-# EB and Snow Routines
-include(joinpath(path_dddfun, "NedbEBGlac_debug04072022.jl"))
-include(joinpath(path_dddfun, "SnowpackTemp.jl"))
-include(joinpath(path_dddfun, "TempstartUpdate.jl"))
-include(joinpath(path_dddfun, "SmeltEBGlac_debug04072022.jl"))
-include(joinpath(path_dddfun, "CloudCoverGlac_debug04072022.jl"))
-include(joinpath(path_dddfun, "TssDewpoint.jl"))
-include(joinpath(path_dddfun, "SolradTransAlbedoper_hrs_debug04072022.jl"))
-include(joinpath(path_dddfun, "LongWaveRad_debug04072022.jl"))
-include(joinpath(path_dddfun, "SensibleLatHeat_debug04072022.jl"))
-include(joinpath(path_dddfun, "AlbedoUEB_debug04072022.jl"))
-include(joinpath(path_dddfun, "GroundPrecCC.jl"))
-include(joinpath(path_dddfun, "SnowGamma.jl"))
-include(joinpath(path_dddfun, "Varc.jl"))
-include(joinpath(path_dddfun, "NewSnowDensityEB.jl"))
-include(joinpath(path_dddfun, "NewSnowSDEB.jl"))
-include(joinpath(path_dddfun, "DensityAge.jl"))
-# Subsurface and Evaporation routines
-include(joinpath(path_dddfun, "LayerCapacityUpdate.jl"))
-include(joinpath(path_dddfun, "PotentialEvapPT.jl"))
-include(joinpath(path_dddfun, "UnsaturatedEvapEB.jl"))
-include(joinpath(path_dddfun, "LayerEvap.jl"))
-include(joinpath(path_dddfun, "UnsaturatedExEvap.jl"))
-include(joinpath(path_dddfun, "WetlandsEB.jl"))
-include(joinpath(path_dddfun, "GrvInputDistributionICap2022.jl"))
-include(joinpath(path_dddfun, "OFICap.jl"))
-include(joinpath(path_dddfun, "LayerUpdate.jl"))
-include(joinpath(path_dddfun, "BogLayerUpdate.jl"))
-include(joinpath(path_dddfun, "RiverUpdate.jl"))
-# Overland Flow routine
-include(joinpath(path_dddfun, "OverlandFlowDynamicDD.jl"))
-# Efficiency criteria
-include(joinpath(path_dddfun, "NSE_ths.jl"))
-include(joinpath(path_dddfun, "KGE_ths.jl"))
-# Model Module
-include(joinpath(path_dddfun, "DDDAllTerrain22012024.jl"))
-
-#function makeEvaluator(parameters_initial::Vector{Float64}, path_ptq::String, spinup::Int)
-#    return let
-#        parameters_initial = parameters_initial,
-#        path_ptq = path_ptq,
-#        spinup = spinup
-#        function wrapper(x::Vector{Float64})
-#            return DDDAllTerrain(1, x, parameters_initial, path_ptq, "", "", 0, 0, 1, spinup)[3]
-#        end
-#    end
-#end
-
-function makeEvaluator(parameters_initial::DataFrame, path_ptq::String, spinup::Int)
+function makeEvaluator(parameters_initial::Vector{Float64}, path_ptq::String, spinup::Int)
     function wrapper(x::Vector{Float64})
-        score_kge = DDDAllTerrain(1, x, parameters_initial, path_ptq, "", "", 0, 0, 1, spinup)[3]
-        return 1 - score_kge
+        kge = DDDAllTerrain(1, x, parameters_initial, path_ptq, "", "", 0, 0, 1, spinup)[3]
+        return 1 - kge
     end
     return wrapper
 end
@@ -98,10 +34,17 @@ for id in catchments
         bounds = [Tuple(parameter_ranges["default"][:,k]) for k in order_parameters]
     end
     path_ptq = replace(settings["path"]["ptq"], "{CATCHMENT}" => id, "{PERIOD}" => settings["periods"]["calibration"])
-    parameters_initial = CSV.read(replace(settings["path"]["parameters_initial"], "{CATCHMENT}" => id),
-                                  DataFrame, header=["Name", "val"], delim=';')
-    evaluator = makeEvaluator(parameters_initial, path_ptq, settings["spinup"])
-    res = bboptimize(evaluator; SearchRange=bounds, MaxSteps=1000, TraceMode=:verbose, NThreads=num_threads)
+    path_initial_param = replace(settings["path"]["parameters_initial"], "{CATCHMENT}" => id)
+    parameters_initial = CSV.read(path_initial_param, DataFrame, header=["Name", "val"], delim=';')
+    # TESTS - START
+    x = [parameters_initial.val[i] for i in [20, 21, 22, 18, 19, 33, 34, 35, 36, 37]]
+    for i in range(1, 2)
+        @time aux = DDDAllTerrain(1, x, parameters_initial.val, path_ptq, "", "", 0, 0, 1, settings["spinup"]);
+    end
+    @infiltrate
+    # TESTS - END
+    evaluator = makeEvaluator(parameters_initial.val, path_ptq, settings["spinup"])
+    res = bboptimize(evaluator; SearchRange=bounds, MaxSteps=1000, TraceMode=:compact, NThreads=num_threads)
     param_hydro = best_candidate(res)
     dir_out = mkpath(joinpath(settings["path"]["output"], id))
     exit()
