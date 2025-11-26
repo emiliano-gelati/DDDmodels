@@ -83,7 +83,7 @@ include(joinpath(@__DIR__, "KGE_ths.jl"))
 
 
 function DDDAllTerrain(startsim::Int, tprm::Vector{Float64}, prm::Vector{Float64}, ptqfile::String, utfile::String,
-                       r2fil::String, modstate::Int, savestate::Int, kal::Int, spinuptime::Int)
+                       r2fil::String, modstate::Int, savestate::Int, kal::Int, spinuptime::Int, silent::Bool=false)
 
 DDA = 6  # number of landscape types with distance distribution
 # DDA=1 Permeable (P) areas
@@ -280,7 +280,7 @@ if (Ltyfrac[5] > 0.05 ) #Fraction of glaciers
      MAD = MAD2    # needs to adjust MAD if glaciers are present since MAD is used to estimate the groundwater reservoir
 end
 
-if kal == 0
+if !silent & (kal == 0)
     println("Mad= ", MAD)
 end
 
@@ -572,7 +572,7 @@ for i in startsim:days
 	    if(kal == 1)
           spd[idim]  = 8000.0
 	      skorr= 0.9*skorr
-          println("Skorr is reduced, you build snowtowers = trend in SWE")
+          !silent && println("Skorr is reduced, you build snowtowers = trend in SWE")
 	    end 
       end
       
@@ -925,7 +925,7 @@ end
 
 end # end of loop for number of timesteps in timeseries
 
-if kal == 0
+if !silent & (kal == 0)
     println("nodaysLake=",nodaysLake)
     println("nodaysRiver=",nodaysRiv)
 end
@@ -955,12 +955,12 @@ wwater = 1.0*persons*(140.0 + 42.0)/(86400.0*1000.0)# norsk vann equivalent use 
           "SM_P","SM_IP","Ea_P","Ea_IP","Qmm","SMBog","EaBog","qmm_state","Boglyrs","SCA_IP", "SWE_IP","WCS_P", "WCS_IP","SS_P", "SS_IP",
           "Q_OF", "outglac", "r_sm_outglac", "gisoil", "misoil","snittT[1]"]
   CSV.write(utfile,DataFrame(simresult,:auto), delim = ';', header=toptitles)                
-  println("M= ", round(M[1],digits=2)," ",round(M[2],digits =2))
-  println("k_P= ", round(k[1,1],digits=6)," ",round(k[1,2],digits=6)," ",round(k[1,3],digits=6)," ",round(k[1,4],digits=6)," ",round(k[1,5],digits=6))
-  if (area[2] >0.0)
+  !silent && println("M= ", round(M[1],digits=2)," ",round(M[2],digits =2))
+  !silent && println("k_P= ", round(k[1,1],digits=6)," ",round(k[1,2],digits=6)," ",round(k[1,3],digits=6)," ",round(k[1,4],digits=6)," ",round(k[1,5],digits=6))
+  if !silent & (area[2] > 0)
    println("k_IP= ", round(k[2,1],digits=6)," ",round(k[2,2],digits=6)," ",round(k[2,3],digits=6)," ",round(k[2,4],digits=6)," ",round(k[2,5],digits=6))
   end
-  println("Mean(Qsim)= ",meansim)
+  !silent && println("Mean(Qsim)= ",meansim)
  end           
 
 return ptqinn.q, qberegn, KGE,NSE,bias
