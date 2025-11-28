@@ -1,66 +1,84 @@
 using Infiltrator
+using Configurations
 using TOML
 using CSV
 using DataFrames
 using BlackBoxOptim
 include(joinpath(dirname(@__DIR__), "DDDFunctions", "DDDAllTerrain22012024.jl"))
 
-function makeEvaluator(parameters_initial::Vector{Float64}, path_ptq::String, spinup::Int)
-    function wrapper(x::Vector{Float64})
-        kge = DDDAllTerrain(1, x, parameters_initial, path_ptq, "", "", 0, 0, 1, spinup, true)[3]
+@option struct SettingsCalibration
+    name::String
+    spinup::Int
+    periods::Dict{String,String}
+    path::Dict{String,String}
+end
+
+function runDDD(paths_ptq::Dict{String,String}, params_hyd::Vector{Float64}, params_all::Vector{Float64}, spinup::Int, dir_out::String)
+    kge = Dict(k => NaN for k in eachindex(paths_ptq))
+    runtimes = Dict(k => NaN for k in eachindex(paths_ptq))
+    Threads.@threads for p in collect(eachindex(paths_ptq))
+        path_out_series = joinpath(dir_out, "series_$(p).csv")
+        path_out_r2 = joinpath(dir_out, "r2_$(p).csv")
+        t0 = time()
+        kge[p] = DDDAllTerrain(1, params_hyd, params_all, paths_ptq[p], path_out_series, path_out_r2, 0, 0, 0, spinup, true)[3]
+        runtimes[p] = time() - t0
+    end
+    println("    - KGE: " * join(["$k ($(round(v, digits=4)))" for (k, v) in kge], ", "))
+    println("    - Run times (s): " * join(["$k ($(round(Int, v)))" for (k, v) in runtimes], ", "))
+end
+
+function makeEvaluator(parameters_all::Vector{Float64}, path_ptq::String, spinup::Int)
+    function wrapper(hydpar::Vector{Float64})
+        kge = DDDAllTerrain(1, hydpar, parameters_all, path_ptq, "", "", 0, 0, 1, spinup, true)[3]
         return 1 - kge
     end
     return wrapper
 end
 
 function main(path_toml::String)
+    # Names and positions of (hydrologic) parameters to be calibrated in the full parameter set
+    names_hydpar = ["u", "pro", "TX", "Pkorr", "skorr", "GscInt", "OVP", "OVIP", "Lv", "rv"]
+    positions_hydpar = [20, 21, 22, 18, 19, 33, 34, 35, 36, 37]
     # Load settings from TOML file
-    settings = TOML.parsefile(path_toml)
-    settings["periods"] = convert(Dict{String,String}, settings["periods"])
-    settings["path"] = convert(Dict{String,String}, settings["path"])
+    settings = from_toml(SettingsCalibration, path_toml)
     # Load catchment list
-    catchments = readlines(settings["path"]["catchments"])
+    catchments = readlines(settings.path["catchments"])
     filter!(line -> !isempty(strip(line)) && !startswith(strip(line), "#"), catchments)
     # Load parameter ranges
-    raw = TOML.parsefile(settings["path"]["parameter_ranges"])
-    parameter_ranges = Dict(k => DataFrame(convert(Dict{String,Vector{Float64}}, d)) for (k, d) in raw)
+    raw = TOML.parsefile(settings.path["parameter_ranges"])
+    bounds_all = Dict(k => DataFrame(convert(Dict{String,Vector{Float64}}, d)) for (k, d) in raw)
     # Loop through catchments
-    for id in catchments
-        println("\nCATCHMENT $(id)")
-        ## Output root folder for catchment
-        dir_out = mkpath(joinpath(settings["path"]["output"], id))
-        ## Load initial parameters
-        path_initial_param = replace(settings["path"]["parameters_initial"], "{CATCHMENT}" => id)
-        parameters_initial = CSV.read(path_initial_param, DataFrame, header=["Name", "val"], delim=';')
-        x = [parameters_initial.val[i] for i in [20, 21, 22, 18, 19, 33, 34, 35, 36, 37]]
-        ## Run DDD for all periods using initial parameters, and measure execution time
-        dir_out_initial = mkpath(joinpath(dir_out, "initial"))
-        println("Simulation results using initial parameters in $(dir_out_initial)")
-        kge = Dict(k => NaN for k in eachindex(settings["periods"]))
-        runtimes = Dict(k => NaN for k in eachindex(settings["periods"]))
-        Threads.@threads for p in collect(eachindex(settings["periods"]))
-            path_ptq = replace(settings["path"]["ptq"], "{CATCHMENT}" => id, "{PERIOD}" => settings["periods"][p])
-            path_series = joinpath(dir_out_initial, "series_$(p)_$(id).csv")
-            path_r2 = joinpath(dir_out_initial, "r2_$(p)_$(id).csv")
-            t0 = time()
-            kge[p] = DDDAllTerrain(1, x, parameters_initial.val, path_ptq, path_series, path_r2, 0, 0, 0, settings["spinup"], true)[3]
-            runtimes[p] = time() - t0
-        end
-        println("KGE using initial parameters: " * join(["$k ($(round(v, digits=4)))" for (k, v) in kge], ", "))
-        println("Run times (s): " * join(["$k ($(round(Int, v)))" for (k, v) in runtimes], ", "))
+    for (n, id) in enumerate(catchments)
+        println("\nCATCHMENT $(id) ($(n)/$(length(catchments)))")
+        ## Paths to PTQ input for each period
+        paths_ptq = Dict(k => replace(settings.path["ptq"], "{CATCHMENT}" => id, "{PERIOD}" => v) for (k, v) in settings.periods)
+        ## Root folder for catchment output
+        root_out = mkpath(joinpath(settings.path["output"], id))
+        ## Load initial parameters and run DDD
+        path_inipar = replace(settings.path["parameters_initial"], "{CATCHMENT}" => id)
+        parameters_all = CSV.read(path_inipar, DataFrame, header=["Name", "val"], delim=';')
+        parameters_hyd = [parameters_all.val[i] for i in positions_hydpar]
+        dir_out_ini = mkpath(joinpath(root_out, "initial"))
+        println("  DDD runs using initial parameters (output in $(dir_out_ini)):")
+        runDDD(paths_ptq, parameters_hyd, parameters_all.val, settings.spinup, dir_out_ini)
         ## Calibrate
         num_threads = max(Threads.nthreads() - 1, 1)
-        order_parameters = ["u", "pro", "TX", "Pkorr", "skorr", "GscInt", "OVP", "OVIP", "Lv", "rv"]
-        if haskey(parameter_ranges, id)
+        if haskey(bounds_all, id)
             error("Not implemented yet: parameter ranges for individual catchments")
         else
-            bounds = [Tuple(parameter_ranges["default"][:,k]) for k in order_parameters]
+            bounds_local = [Tuple(bounds_all["default"][:,k]) for k in names_hydpar]
         end
-        path_ptq = replace(settings["path"]["ptq"], "{CATCHMENT}" => id, "{PERIOD}" => settings["periods"]["calibration"])
-        evaluator = makeEvaluator(parameters_initial.val, path_ptq, settings["spinup"])
-        res = bboptimize(evaluator; SearchRange=bounds, MaxSteps=1000, TraceMode=:compact, NThreads=num_threads)
-        param_hydro = best_candidate(res)
-        exit()
+        evaluator = makeEvaluator(parameters_all.val, paths_ptq["calibration"], settings.spinup)
+        res = bboptimize(evaluator; SearchRange=bounds_local, MaxSteps=1, TraceMode=:compact, NThreads=num_threads)
+        ## Write calibrated parameters to file
+        dir_out_cal = mkpath(joinpath(root_out, "calibrated"))
+        parameters_hyd = best_candidate(res)
+        findall(in(names_hydpar), parameters_all[:,"Name"]) # FIX: name discrepancies between all parameters and parameter ranges!
+        ## Run DDD with calibrated parameters
+        println("  DDD runs using calibrated parameters (output in $(dir_out_ini)):")
+        runDDD(paths_ptq, parameters_hyd, parameters_all.val, settings.spinup, dir_out_ini)
+        @infiltrate
+        res.elapsed_time
     end
 end
 
