@@ -1,14 +1,13 @@
-name = "251120"
+root_output = "/hdata/hmdata01/DDD_calibration/output_251120/"
+template_path_ptq = "/hdata/hmdata01/DDD_calibration/inndataV2/<CATCHMENT>/<CATCHMENT>_3h_ptq_SN2018_2209_<PERIOD>.csv"
+path_catchments_list = "settings/catchments/catchments_251120.txt"
+path_parameter_ranges = "settings/parameter_ranges/parameter_ranges_251120.toml"
+path_initial_parameters = "/hdata/hmdata01/DDD_calibration/BestPrimo2025/Best_par_<CATCHMENT>_3h_DDDv2.csv"
+
 spinup = 365 # days
+steps_max = 1000 # maximum number of steps used by the optimisation algorithm
 
 [periods]
 calibration = "kal"
 validation = "val"
 test = "test"
-
-[path]
-catchments = "settings/catchments/catchments_251120.txt"
-parameter_ranges = "settings/parameter_ranges/parameter_ranges_251120.toml"
-parameters_initial = "/hdata/hmdata01/DDD_calibration/BestPrimo2025/Best_par_{CATCHMENT}_3h_DDDv2.csv"
-ptq = "/hdata/hmdata01/DDD_calibration/inndataV2/{CATCHMENT}/{CATCHMENT}_3h_ptq_SN2018_2209_{PERIOD}.csv"
-output = "/hdata/hmdata01/DDD_calibration/output_251120/"
