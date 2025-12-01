@@ -114,8 +114,8 @@ function main(path_toml::String)
         parameters_all = CSV.read(path_inipar, DataFrame, header=["Name", "val"], delim=';')
         parameters_hyd = [parameters_all.val[i] for i in positions_hydpar]
         dir_out_ini = mkpath(joinpath(dir_out, "initial"))
-#        println("  * DDD runs using initial parameters: output in ", dir_out_ini)
-#        runDDD(paths_ptq, parameters_hyd, parameters_all, settings.spinup, dir_out_ini)
+        println("  * DDD runs using initial parameters: output in ", dir_out_ini)
+        runDDD(paths_ptq, parameters_hyd, parameters_all, settings.spinup, dir_out_ini)
         ## Calibrate
         num_threads = max(Threads.nthreads() - 1, 1)
         if haskey(bounds_all, id)
