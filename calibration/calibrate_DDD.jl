@@ -60,10 +60,10 @@ include(joinpath(dir_DDD, "DDDAllTerrain22012024.jl"))
 
 @option struct SettingsCalibration
     root_output::String
-    template_path_ptq::String
     path_catchments_list::String
     path_parameter_ranges::String
-    path_initial_parameters::String
+    template_path_ptq::String
+    template_path_inipar::String
     spinup::Int
     steps_max::Int
     periods::Dict{String,String}
@@ -74,21 +74,13 @@ function pathsPTQ(id::String, settings::SettingsCalibration)
 end
 
 function pathIniPar(id::String, settings::SettingsCalibration)
-    replace(settings.path_initial_parameters, "<CATCHMENT>" => id)
+    replace(settings.template_path_inipar, "<CATCHMENT>" => id)
 end
 
 function checkInput(id::String, settings::SettingsCalibration)
     paths = pathsPTQ(id, settings)
     paths["inipar"] = pathIniPar(id, settings)
-    ok = Dict(vcat(["id" => id],[k => true for k in keys(paths)]))
-    for (k, p) in paths
-        try
-            CSV.read(p, DataFrame);
-        catch
-            ok[k] = false
-        end
-    end
-    return ok
+    Dict(vcat(["id" => id],[k => isfile(p) for (k, p) in paths]))
 end
 
 function runDDD(paths_ptq::Dict{String,String}, params_hyd::Vector{Float64}, params_all::DataFrame, spinup::Int, dir_out::String, txt::String)
@@ -122,10 +114,10 @@ function main(path_toml::String)
     filter!(line -> !isempty(strip(line)) && !startswith(strip(line), "#"), catchments)
     # Check that input files are valid
     ok_input = DataFrame(checkInput.(catchments, Ref(settings)))
-    if !all(all.(eachrow(ok_input[:,setdiff(names(ok_input), ["id"])])))
-        error("Some input files do not exist or are not valid:\n", ok_input)
+    is_bad = (!all).(eachrow(ok_input[:,setdiff(names(ok_input), ["id"])]))
+    if any(is_bad)
+        error(println("Some input files do not exist or are not valid:\n", ok_input[is_bad,:]))
     end
-    @infiltrate
     # Load parameter ranges
     raw = TOML.parsefile(settings.path_parameter_ranges)
     bounds_all = Dict(k => DataFrame(convert(Dict{String,Vector{Float64}}, d)) for (k, d) in raw)
@@ -137,7 +129,7 @@ function main(path_toml::String)
         ## Paths to PTQ input for each period
         paths_ptq = pathsPTQ(id, settings)
         ## Load initial parameters and run DDD
-        path_inipar = replace(settings.path_initial_parameters, "<CATCHMENT>" => id)
+        path_inipar = replace(settings.template_path_inipar, "<CATCHMENT>" => id)
         parameters_all = CSV.read(path_inipar, DataFrame, header=["Name", "val"], delim=';')
         parameters_hyd = [parameters_all.val[i] for i in positions_hydpar]
         dir_out_ini = mkpath(joinpath(dir_out, "initial"))
