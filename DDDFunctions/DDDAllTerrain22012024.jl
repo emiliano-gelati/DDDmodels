@@ -27,6 +27,7 @@
 # Running DDD:    It is possible to save model state variables and run the model
 #                 starting from saved state variables
 #----------------------------------------------------------------------------------
+import Base.Threads: nthreads, threadid
 
 function DDDAllTerrain(Gpar, startsim, tprm, prm ,ptqfile,utfile,r2fil, modstate,savestate, kal, spinuptime, silent=false)
 
@@ -883,14 +884,17 @@ wwater = 1.0*persons*(140.0 + 42.0)/(86400.0*1000.0)# norsk vann equivalent use 
  KGE, beta = (kge((wwater .+ qberegn[skillstart:days2]),ptqinn.q[skillstart:days2]))
  NSE = (nse((wwater .+ qberegn[skillstart:days2]),ptqinn.q[skillstart:days2]))
  bias = beta #(meansim/meanobs)
-#bias = (meansim/meanobs) 
+#bias = (meansim/meanobs)
+
+ #Recall, tprm is the parameter vector
+ #                                       u,        pro,        TX,      PCritFlux,         OFP,        GshInt,   GscInt, persons
+ dfy = DataFrame(A=NSE,B=KGE,C=bias,D=tprm[1],E=tprm[2],F=tprm[3],G=tprm[4], H=tprm[5], II =tprm[6],IJ=tprm[7],
+     JJ=tprm[8], KJ= tprm[9], LJ= tprm[10])
+ # if calibrating and multithreading, create a r2 file per thread and thus avoid simultaneous writing to the same file
+ path_r2 = kal == 1 && nthreads() > 1 ? replace(r2fil, ".csv" => "_$(lpad(threadid(), 3, '0')).csv") : r2fil
+ CSV.write(path_r2, dfy, delim = ';', header=false, append = true)
 
  if (kal==0)
-  #Recall, tprm is the parameter vector
-  #                                       u,        pro,        TX,      PCritFlux,         OFP,        GshInt,   GscInt, persons
-  dfy = DataFrame(A=NSE,B=KGE,C=bias,D=tprm[1],E=tprm[2],F=tprm[3],G=tprm[4], H=tprm[5], II =tprm[6],IJ=tprm[7],
-      JJ=tprm[8], KJ= tprm[9], LJ= tprm[10])
-  CSV.write(r2fil,DataFrame(dfy), delim = ';', header=false, append = true)
   toptitles = ["Yr","Mnt","Day", "Hr","Min","Precip","Temp","Qobs","Qsim","Q_P","Q_IP","Q_Bogs","SCA_P","SWE_P","SS+_P", "SS+_IP","SSDef_P","SSDef_IP",
           "SM_P","SM_IP","Ea_P","Ea_IP","Qmm","SMBog","EaBog","qmm_state","Boglyrs","SCA_IP", "SWE_IP","WCS_P", "WCS_IP","SS_P", "SS_IP",
           "Q_OF", "outglac", "r_sm_outglac", "gisoil", "misoil","snittT[1]"]

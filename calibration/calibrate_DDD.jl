@@ -9,6 +9,7 @@ using LsqFit
 using Statistics
 using Dates
 using JLD2
+
 # Folder with DDD main program and functions
 dir_DDD = joinpath(dirname(@__DIR__), "DDDFunctions")
 # Preprocessing routines
@@ -94,12 +95,11 @@ function runDDD(paths_ptq::Dict{String,String}, params_hyd::Vector{Float64}, par
     println(" -> KGE (period): ", join(["$(round(v, digits=4)) ($k)" for (k, v) in kge_score], ", "))
 end
 
-function makeEvaluator(parameters_all::DataFrame, path_ptq::String, spinup::Int)
+function makeEvaluator(parameters_all::DataFrame, path_ptq::String, spinup::Int, path_r2::String)
     function wrapper(hydpar::Vector{Float64})
-        kge_score = DDDAllTerrain(nothing, 1, hydpar, parameters_all, path_ptq, "", "", 0, 0, 1, spinup, true)[3]
-        return 1 - kge_score
+        kge_score = DDDAllTerrain(nothing, 1, hydpar, parameters_all, path_ptq, "", path_r2, 0, 0, 1, spinup, true)[3]
+        return 1. - kge_score
     end
-    return wrapper
 end
 
 function main(path_toml::String)
@@ -134,13 +134,17 @@ function main(path_toml::String)
         parameters_hyd = [parameters_all.val[i] for i in positions_hydpar]
         dir_out_ini = mkpath(joinpath(dir_out, "initial"))
         runDDD(paths_ptq, parameters_hyd, parameters_all, settings.spinup, dir_out_ini, "initial parameters")
-        ## Calibrate
+        ## Modify parameter bounds if specified for catchment (NOT IMPLEMENTED YET)
         if haskey(bounds_all, id)
             error("Not implemented yet: parameter ranges for individual catchments")
         else
             bounds_local = [Tuple(bounds_all["default"][:,k]) for k in names_hydpar]
         end
-        evaluator = makeEvaluator(parameters_all, paths_ptq["calibration"], settings.spinup)
+        ## Calibrate
+        dir_out_cal = mkpath(joinpath(dir_out, "calibrated"))
+        dir_log_cal = mkpath(joinpath(dir_out_cal, "log"))
+        template_path_r2 = joinpath(dir_log_cal, "r2.csv")
+        evaluator = makeEvaluator(parameters_all, paths_ptq["calibration"], settings.spinup, template_path_r2)
         print("\tCalibration started on ", Dates.format(now(), "yyyy-mm-dd HH:MM"))
         res = redirect_stdio(stdout=devnull, stderr=devnull) do
             bboptimize(evaluator; SearchRange=bounds_local, MaxSteps=settings.steps_max, TraceMode=:silent, SaveTrace=true, NThreads=num_threads)
@@ -150,12 +154,8 @@ function main(path_toml::String)
         ## Write calibrated parameters to file
         parameters_hyd = best_candidate(res)
         parameters_all[positions_hydpar,"val"] .= parameters_hyd
-        dir_out_cal = mkpath(joinpath(dir_out, "calibrated"))
         CSV.write(joinpath(dir_out_cal, "parameters.csv"), parameters_all, delim=';', writeheader=false)
-        ## Save best parameter sets (50 by default?) and KGE to file
-        population = DataFrame(hcat(res.method_output.population.fitness, transpose(res.method_output.population.individuals)),
-                               vcat(["KGE"], names_hydpar))
-        CSV.write(joinpath(dir_out_cal, "logged_solutions.csv"), population)
+        ## Merge calibration log files (1 r2fil per thread): TO DO (function in DDDAll... to rename r2fil and reuse it here)!
         ## Run DDD with calibrated parameters
         runDDD(paths_ptq, parameters_hyd, parameters_all, settings.spinup, dir_out_cal, "calibrated parameters")
     end
