@@ -28,8 +28,62 @@
 #                 starting from saved state variables
 #----------------------------------------------------------------------------------
 import Base.Threads: nthreads, threadid
+using CSV
+using DataFrames
+using Distributions
+using LsqFit
+using Statistics
+using Dates
+using JLD2
+# Preprocessing routines
+include("Big2SmallLambda.jl")
+include("CeleritySubSurface.jl")
+include("SingleUH.jl")
+include("SingleNormalUH.jl")
+include("LayerEstimation.jl")
+include("PyrAreas.jl")
+include("GrWPoint.jl")
+include("RiverPoint.jl")
+include("TemperatureVector.jl")
+# EB and Snow Routines
+include("NedbEBGlac_debug04072022.jl")
+include("SnowpackTemp.jl")
+include("TempstartUpdate.jl")
+include("SmeltEBGlac_debug04072022.jl")
+include("CloudCoverGlac_debug04072022.jl")
+include("TssDewpoint.jl")
+include("SolradTransAlbedoper_hrs_debug04072022.jl")
+include("LongWaveRad_debug04072022.jl")
+include("SensibleLatHeat_debug04072022.jl")
+include("AlbedoUEB_debug04072022.jl")
+include("GroundPrecCC.jl")
+include("SnowGamma.jl")
+include("Varc.jl")
+include("NewSnowDensityEB.jl")
+include("NewSnowSDEB.jl")
+include("DensityAge.jl")
+# Subsurface and Evaporation routines
+include("LayerCapacityUpdate.jl")
+include("PotentialEvapPT.jl")
+include("UnsaturatedEvapEB.jl")
+include("LayerEvap.jl")
+include("UnsaturatedExEvap.jl")
+include("WetlandsEB.jl")
+include("GrvInputDistributionICap2022.jl")
+include("OFICap.jl")
+include("LayerUpdate.jl")
+include("BogLayerUpdate.jl")
+include("RiverUpdate.jl")
+# Overland Flow routine
+include("OverlandFlowDynamicDD.jl")
+# Efficiency criteria
+include("NSE_ths.jl")
+include("KGE_ths.jl")
 
-function DDDAllTerrain(Gpar, startsim, tprm, prm ,ptqfile,utfile,r2fil, modstate,savestate, kal, spinuptime, silent=false)
+
+
+function DDDAllTerrain(Gpar::Nothing, startsim::Int, tprm::Vector{Float64}, prm::DataFrame, ptqfile::String, utfile::String,
+                       r2fil::String, modstate::Int, savestate::Int, kal::Int, spinuptime::Int, silent::Bool=false)
 
 
 DDA = 6  # number of landscape types with distance distribution

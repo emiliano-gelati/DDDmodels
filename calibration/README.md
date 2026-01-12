@@ -12,7 +12,7 @@ for how to recreate the Julia environment to calibrate DDD.
 
 To calibrate DDD on a set of catchments using 10 parallel threads, run
 
-`julia --project=. --threads 11 calibrate_DDD.jl <path/to/settings.toml>`
+`julia --project=. --threads 11 calibrate_multiple_catchments.jl <path/to/settings.toml>`
 
 where the last argument is the path to a TOML file (for example `settings/calibration_251120.toml`)
 containing the following entries:
@@ -39,7 +39,7 @@ containing the following entries:
 ## 3. Output
 
 For each catchment, results are written in folder `root_output/<CATCHMENT>/`, where the `initial/`
-and `calibrated` subfolders contains output from DDD runs with initial and calibrated parameter
+and `calibrated/` subfolders contains output from DDD runs with initial and calibrated parameter
 values, respectively.
 
 In each subfolder, the following files are written by
@@ -48,24 +48,32 @@ In each subfolder, the following files are written by
 - `r2_<PERIOD>.csv`: row file with NSE, KGE, bias and hydrologic parameter values.
 - `series_<PERIOD>.csv`: DDD output time series.
 
-Additional files in the `calibrated/` subfolder:
+Additional items in the `calibrated/` subfolder:
 
 - `parameters.csv`: new full parameter set defining the catchment, including the newly calibrated
   hydrologic parameters.
-- `logged_solutions.csv`: KGE and hydrologic parameter values at the last iteration of the
-  optimisation algorithm. This log is produced by
-  [BlackBoxOptim.jl](https://docs.sciml.ai/Optimization/stable/optimization_packages/blackboxoptim/).
+- `log/`: all parameter sets, and corresponding scores, tried by the optimisation algorithm and
+  logged in separate files (one file per computational thread to avoid concurrent access).
+  Each row has the same format as the `r2_<PERIOD>.csv` files described above.
 
 
-## 4. Possible improvements
+## 4. Restart
 
+The presence of the empty file `root_output/<CATCHMENT>/done` means that calibration ran
+until the stopping criterion for that catchment: If the calibration script is re-run, this
+catchment will be skipped.
+
+## 5. Possible improvements
+
+0. Diagnostic plots for each catchment: time series, parameters, etc.
 1. Redefine DDDAll... as made up of 2 functions: f1 loading PTQ time series, and f2 doing the rest
    taking PTQ series among its input. To calibrate a catchment, f1 would be called only once and
-   f2 would be iterated over by the search algorith.
-2. Specify which parameters should be calibrated and which have a fixed value in settings,
+   f2 would be iterated over by the search algorithm.
+2. Use TypedTables instead of DataFrames to read input from CSV files and to pass data to the model,
+   to ensure type stability (types of DataFrame columns are unknown a priori to the compiler)
+3. Specify which parameters should be calibrated and which have a fixed value in settings,
    instead of using collapsed ranges, to reduce the formal number of parameters.
-3. Check that functions are type-stable to avoid performance losses.
-4. Profile DDD code to look for performance bottlenecks.
-5. Test if using views instead of slices improves performance by reducing memory allocations.
-6. DDDAllTerrain: select columns of ptqinn with syntax [:,"q"] so that the output is Vector?
+4. Check that functions are type-stable to avoid performance losses.
+5. Profile DDD code to look for performance bottlenecks.
+6. Test if using views instead of slices improves performance by reducing memory allocations.
 7. Sensitivity analysis (e.g. [GlobalSensitivity.jl](https://docs.sciml.ai/GlobalSensitivity/stable/))
