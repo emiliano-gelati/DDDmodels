@@ -6,7 +6,7 @@ include("calibration.jl")
 path_settings, id, period = ARGS
 
 # Simple run
-#runSingleCatchment(path_settings, id, period)
+runSingleCatchment(path_settings, id, period)
 
 #using Profile
 #Profile.clear()
@@ -16,8 +16,8 @@ path_settings, id, period = ARGS
 #using InteractiveUtils
 #@code_warntype runSingleCatchment(path_settings, id, period)
 
-using BenchmarkTools
-@benchmark runSingleCatchment(path_settings, id, period)
+#using BenchmarkTools
+#@benchmark runSingleCatchment(path_settings, id, period)
 
 # ProfileView displays works in REPL and not script
 #include("calibration.jl")

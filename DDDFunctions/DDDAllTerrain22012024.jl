@@ -82,10 +82,10 @@ include("KGE_ths.jl")
 
 
 
-function DDDAllTerrain(Gpar::Nothing, startsim::Int, tprm::Vector{Float64}, prm::DataFrame, ptqfile::String, utfile::String,
+function DDDAllTerrain(Gpar::Vector{Float64}, startsim::Int, tprm::Vector{Float64}, prm::DataFrame, ptqfile::String, utfile::String,
                        r2fil::String, modstate::Int, savestate::Int, kal::Int, spinuptime::Int, silent::Bool=false)
 
-
+# TO DO: remove Gpar argument which is not used
 DDA = 6  # number of landscape types with distance distribution
 # DDA=1 Permeable (P) areas
 # DDA=2 ImPermeable (IP) areas

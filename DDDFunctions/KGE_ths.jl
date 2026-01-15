@@ -13,6 +13,7 @@ function kge(q_sim, q_obs)
     if all(isnan, q_sim) || all(isnan, q_obs)
 
         kge = NaN
+        beta = NaN
 
     else
 

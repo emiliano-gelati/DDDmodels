@@ -46,14 +46,14 @@ function runDDD(paths_ptq::Dict{String,String}, params_hyd::Vector{Float64}, par
     Threads.@threads for p in collect(eachindex(paths_ptq))
         path_out_series = joinpath(dir_out, "series_$(p).csv")
         path_out_r2 = joinpath(dir_out, "r2_$(p).csv")
-        kge_score[p] = DDDAllTerrain(nothing, 1, params_hyd, params_all, paths_ptq[p], path_out_series, path_out_r2, 0, 0, 0, spinup, true)[3]
+        kge_score[p] = DDDAllTerrain(fill(NaN, 2), 1, params_hyd, params_all, paths_ptq[p], path_out_series, path_out_r2, 0, 0, 0, spinup, true)[3]
     end
     println(" -> KGE (period): ", join(["$(round(v, digits=4)) ($k)" for (k, v) in kge_score], ", "))
 end
 
 function makeEvaluator(parameters_all::DataFrame, path_ptq::String, spinup::Int, path_r2::String)
     function wrapper(hydpar::Vector{Float64})
-        kge_score = DDDAllTerrain(nothing, 1, hydpar, parameters_all, path_ptq, "", path_r2, 0, 0, 1, spinup, true)[3]
+        kge_score = DDDAllTerrain(fill(NaN, 2), 1, hydpar, parameters_all, path_ptq, "", path_r2, 0, 0, 1, spinup, true)[3]
         return 1. - kge_score
     end
 end
@@ -132,13 +132,13 @@ function runSingleCatchment(path_toml::String, id::String, period::String)
     # Load initial parameters
     positions_hydpar = [20, 21, 22, 18, 19, 33, 34, 35, 36, 37]
     path_inipar = replace(settings.template_path_inipar, "<CATCHMENT>" => id)
-    params_all::Vector{Float64} = CSV.read(path_inipar, DataFrame, header=["Name", "val"], delim=';').val
-    params_hyd = [params_all[i] for i in positions_hydpar]
+    params_all = CSV.read(path_inipar, DataFrame, header=["Name", "val"], delim=';')
+    params_hyd::Vector{Float64} = [params_all[i,"val"] for i in positions_hydpar]
     # Root folder for catchment output
     dir_out = mkpath(joinpath(settings.root_output, "single_runs", id))
     path_out_series = joinpath(dir_out, "series_$(id)_$(period).csv")
     path_out_r2 = joinpath(dir_out, "r2_$(id)_$(period).csv")
     println("Output in ", dir_out)
     # Run DDD
-    DDDAllTerrain(1, params_hyd, params_all, path_ptq, path_out_series, path_out_r2, 0, 0, 0, settings.spinup, true)
+    DDDAllTerrain(fill(NaN, 2), 1, params_hyd, params_all, path_ptq, path_out_series, path_out_r2, 0, 0, 0, settings.spinup, true)
 end
