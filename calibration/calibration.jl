@@ -2,10 +2,13 @@ using Configurations
 using Infiltrator
 using TOML
 using CSV
+using Random
 using Dates
 using DataFrames
 using BlackBoxOptim
 include(joinpath(dirname(@__DIR__), "DDDFunctions", "DDDAllTerrain22012024.jl"))
+
+Random.seed!(0)
 
 @option struct SettingsCalibration
     root_output::String
@@ -16,6 +19,22 @@ include(joinpath(dirname(@__DIR__), "DDDFunctions", "DDDAllTerrain22012024.jl"))
     spinup::Int
     steps_max::Int
     periods::Dict{String,String}
+end
+
+mutable struct ParameterSet
+    positions_hyd::Vector{UInt8}
+    all::DataFrame
+    hydrologic::Vector{Float64}
+    function ParameterSet(path_in::String)
+        positions_hyd::Vector{UInt8} = [20, 21, 22, 18, 19, 33, 34, 35, 36, 37]
+        params_all = CSV.read(path_in, DataFrame, header=["Name", "val"], delim=';')
+        hydrologic::Vector{Float64} = [params_all[i,"val"] for i in positions_hyd]
+        new(positions_hyd, params_all, hydrologic)
+    end
+end
+
+function setHydrologicParameters(parameters::ParameterSet, hydrologic::Vector{Float64})
+    parameters.all[parameters.positions_hyd,"val"] .= hydrologic
 end
 
 function pathsPTQ(id::String, settings::SettingsCalibration)
@@ -59,9 +78,6 @@ function makeEvaluator(parameters_all::DataFrame, path_ptq::String, spinup::Int,
 end
 
 function calibrateMultipleCatchments(path_toml::String)
-    # Names and positions (within the full set) of parameters to be calibrated 
-    names_hydpar = ["u", "pro", "TX", "pkorr", "skorr", "GscInt", "OFVP", "OFVIP", "Lv", "Rv"]
-    positions_hydpar = [20, 21, 22, 18, 19, 33, 34, 35, 36, 37]
     # Load settings from TOML file
     settings = from_toml(SettingsCalibration, path_toml)
     num_threads = max(Threads.nthreads() - 1, 1)
@@ -91,14 +107,14 @@ function calibrateMultipleCatchments(path_toml::String)
         paths_ptq = pathsPTQ(id, settings)
         ## Load initial parameters and run DDD
         path_inipar = replace(settings.template_path_inipar, "<CATCHMENT>" => id)
-        parameters_all = CSV.read(path_inipar, DataFrame, header=["Name", "val"], delim=';')
-        parameters_hyd::Vector{Float64} = [parameters_all[i,"val"] for i in positions_hydpar]
+        parameters = ParameterSet(path_inipar)
         dir_out_ini = mkpath(joinpath(dir_out, "initial"))
-        runDDD(paths_ptq, parameters_hyd, parameters_all, settings.spinup, dir_out_ini, "initial parameters")
+        runDDD(paths_ptq, parameters.params_hyd, parameters.params_all, settings.spinup, dir_out_ini, "initial parameters")
         ## Modify parameter bounds if specified for catchment (NOT IMPLEMENTED YET)
         if haskey(bounds_all, id)
             error("Not implemented yet: parameter ranges for individual catchments")
         else
+            names_hydpar = ["u", "pro", "TX", "pkorr", "skorr", "GscInt", "OFVP", "OFVIP", "Lv", "Rv"]
             bounds_local = [Tuple{Float64,Float64}(bounds_all["default"][:,k]) for k in names_hydpar]
         end
         ## Calibrate
@@ -113,12 +129,11 @@ function calibrateMultipleCatchments(path_toml::String)
         print(" and ended after ", canonicalize(Second(Int(round(res.elapsed_time)))))
         println(" -> KGE: ", round(1 - best_fitness(res), digits=4))
         ## Write calibrated parameters to file
-        parameters_hyd = best_candidate(res)
-        parameters_all[positions_hydpar,"val"] .= parameters_hyd
-        CSV.write(joinpath(dir_out_cal, "parameters.csv"), parameters_all, delim=';', writeheader=false)
+        setHydrologicParameters(parameters, best_candidate(res))
+        CSV.write(joinpath(dir_out_cal, "parameters.csv"), parameters.all, delim=';', writeheader=false)
         ## Merge calibration log files (1 r2fil per thread): TO DO (function in DDDAll... to rename r2fil and reuse it here)!
         ## Run DDD with calibrated parameters
-        runDDD(paths_ptq, parameters_hyd, parameters_all, settings.spinup, dir_out_cal, "calibrated parameters")
+        runDDD(paths_ptq, parameters.hydrologic, parameters.all, settings.spinup, dir_out_cal, "calibrated parameters")
         ## Create empty file ("done") to be used in case of restart to skip this catchment
         touch(pathDone(id, settings))
     end
@@ -130,15 +145,13 @@ function runSingleCatchment(path_toml::String, id::String, period::String)
     # Path to PTQ input
     path_ptq = pathsPTQ(id, settings)[period]
     # Load initial parameters
-    positions_hydpar = [20, 21, 22, 18, 19, 33, 34, 35, 36, 37]
     path_inipar = replace(settings.template_path_inipar, "<CATCHMENT>" => id)
-    params_all = CSV.read(path_inipar, DataFrame, header=["Name", "val"], delim=';')
-    params_hyd::Vector{Float64} = [params_all[i,"val"] for i in positions_hydpar]
+    parameters = ParameterSet(path_inipar)
     # Root folder for catchment output
     dir_out = mkpath(joinpath(settings.root_output, "single_runs", id))
     path_out_series = joinpath(dir_out, "series_$(id)_$(period).csv")
     path_out_r2 = joinpath(dir_out, "r2_$(id)_$(period).csv")
     println("Output in ", dir_out)
     # Run DDD
-    DDDAllTerrain(fill(NaN, 2), 1, params_hyd, params_all, path_ptq, path_out_series, path_out_r2, 0, 0, 0, settings.spinup, true)
+    DDDAllTerrain(fill(NaN, 2), 1, parameters.hydrologic, parameters.all, path_ptq, path_out_series, path_out_r2, 0, 0, 0, settings.spinup, true)
 end

@@ -4,6 +4,7 @@ include("calibration.jl")
 
 @assert length(ARGS) == 3
 path_settings, id, period = ARGS
+#runSingleCatchment(path_settings, id, period)
 
 #using Profile
 #Profile.clear()
