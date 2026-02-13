@@ -33,7 +33,7 @@ mutable struct ParameterSet
     end
 end
 
-function setHydrologicParameters(parameters::ParameterSet, hydrologic::Vector{Float64})
+function setHydrologicParameters!(parameters::ParameterSet, hydrologic::Vector{Float64})
     parameters.all[parameters.positions_hyd,"val"] .= hydrologic
 end
 
