@@ -8,11 +8,11 @@ See [Pkg documentation](https://pkgdocs.julialang.org/v1/environments/#Using-som
 for how to recreate the Julia environment to calibrate DDD.
 
 
-## 2. How to set upo and run a calibration
+## 2. How to set up and run a calibration
 
 To calibrate DDD on a set of catchments using 10 parallel threads, run
 
-`julia --project=. --threads 11 calibrate_multiple_catchments.jl <path/to/settings.toml>`
+`julia --project=.. --threads 11 calibrate_multiple_catchments.jl <path/to/settings.toml>`
 
 where the last argument is the path to a TOML file (for example `settings/calibration_251120.toml`)
 containing the following entries:
@@ -77,3 +77,5 @@ catchment will be skipped.
 5. Profile DDD code to look for performance bottlenecks.
 6. Test if using views instead of slices improves performance by reducing memory allocations.
 7. Sensitivity analysis (e.g. [GlobalSensitivity.jl](https://docs.sciml.ai/GlobalSensitivity/stable/))
+8. Use julia 1.12 and [workspaces](https://pkgdocs.julialang.org/dev/creating-packages/#Test-specific-dependencies)
+   to define test- and calibration-specific dependencies.
