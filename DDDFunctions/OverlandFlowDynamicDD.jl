@@ -58,7 +58,7 @@ function OverlandFlowDynamicDD(k,ddist,outx, layerUH, nodaysvector,NoL, midDL, C
 
       OFUH = SingleUH(celerityOF,Timeresinsec, dmean, maxdistOF, zOF)
       if (length(OFUH) < nodaysvector[1])             # ensures DNR is more dense than original RN
-         layerUH[1,1:length(OFUH)].= OFUH[1:length(OFUH)]
+         layerUH[1,1:length(OFUH)] .= OFUH
          layerUH[1,((length(OFUH)+1):nodaysvector[NoL])] .= 0.0
       end
   end

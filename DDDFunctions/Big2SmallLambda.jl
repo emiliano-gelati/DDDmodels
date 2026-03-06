@@ -12,14 +12,11 @@ function Big2SmallLambda(GshInt,GscInt)
 # using LsqFit
 # using Distributions
 # using Statistics
-  
- arg = zeros(Float64,10)
- avglam = zeros(Float64,10) # number of levels  
- arg[1:9] = [0.1:0.1:0.9;]
- arg[10] = 0.99
+
+arg = vcat([.1:.1:.9;],[.99])
 
 g = Gamma(GshInt,GscInt)
-avglam[1:10] = quantile.(g,arg)
+avglam = quantile.(g,arg) # number of levels
 
 trlam = zeros(Float64,10)  # Lowercase lambda for level
 trlam[1] = avglam[1]

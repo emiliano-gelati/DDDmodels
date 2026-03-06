@@ -1,5 +1,5 @@
 # To run this script:
-# julia --project=. run_single_catchment.jl settings/calibration_251120.toml 2.11 calibration
+# julia --project=.. run_single_catchment.jl settings/calibration_251120.toml 2.11 calibration
 include("calibration.jl")
 
 @assert length(ARGS) == 3
@@ -22,3 +22,10 @@ using BenchmarkTools
 #using ProfileView
 #using Cthulhu
 #@profview runSingleCatchment("settings/calibration_251120.toml", "2.11", "calibration")
+
+# REPL
+#using Profile, OwnTime
+#include("calibration.jl")
+#Profile.clear()
+#@profile runSingleCatchment("settings/calibration_251120.toml", "2.11", "calibration")
+#owntime()

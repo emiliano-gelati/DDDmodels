@@ -495,8 +495,8 @@ FromSnow = SnowGamma(PR[idim],PS[idim],MW[idim],sca[idim],spd[idim],wcd[idim],pr
  GDT_Bog = BogLayers[1] + outbog*UHbog[1]            #Bogwater to be discharged into the river network + this timesteps contribution
     
   #Updating the saturation Layers
-  Layers = LayerUpdate(ddist, outx, Layers, layerUH, nodaysvector, NoL) # mm
-  BogLayers = BogLayerUpdate(outbog, BogLayers, UHbog, antBogsteps)     # mm
+  LayerUpdate!(ddist, outx, Layers, layerUH, nodaysvector, NoL) # mm
+  BogLayerUpdate!(outbog, BogLayers, UHbog, antBogsteps)     # mm
    
   lyrs = sum(Layers)# gives the sum of layers after todays runoff has taken place
   boglyrs = sum(BogLayers)
@@ -524,7 +524,7 @@ FromSnow = SnowGamma(PR[idim],PS[idim],MW[idim],sca[idim],spd[idim],wcd[idim],pr
   qmm_state = (sum(QRivx) - QRD)*(Timeresinsec*1000/totarea)       # This is also a reservoir [mm], water from todays event is stored for future runoff in the RN, relevant for WB.  
   
   GDT_Lake = LakeLayers[1] + QRD*UHLake[1]            #Lakewater to be discharged from outlet + this timesteps contribution, i.e. catchemnt response 
-  LakeLayers = BogLayerUpdate(QRD, LakeLayers, UHLake, nodaysLake)#
+  BogLayerUpdate!(QRD, LakeLayers, UHLake, nodaysLake)#
   Qm3s = GDT_Lake # runoff in m3/s
   Qmm = (GDT_Lake*Timeresinsec*1000/totarea)  #GDT_Lake in mm/Timeresinsec
   

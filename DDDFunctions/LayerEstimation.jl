@@ -26,18 +26,14 @@ mLam = GshInt*GscInt
 varLam = GshInt*(GscInt)^2                           #Yevjevich p.145
 meanIntk = mLam*midDL/Timeresinsec                   #mean celerity estimated through Integrated Celerity
 antBox = Int(trunc(maxDl/(meanIntk*Timeresinsec)))+1 #Temporal length UH_MAD
-UH_MAD = zeros(Float64,antBox)
-sRes = zeros(Float64,antBox) # saturation sum
+sRes = Vector{Float64}(undef, antBox) # saturation sum
 
 #Unit hydrograph for MAD
 UH_MAD = SingleUH(meanIntk,Timeresinsec, midDL, maxDl, 0)
 
 StSt = (1000*MAD*Timeresinsec)/(area2)         # Steady state Input eq. output in mm
-sRes[1] = 0
-sRes[2:antBox] .= StSt.*UH_MAD[2:antBox]
-
-for i in 3: antBox
-  sRes[i:antBox] .= sRes[i:antBox] + StSt.*UH_MAD[i:antBox]
+for i in 1:antBox
+  sRes[i] = (i - 1) * StSt * UH_MAD[i]
 end
 
 mRes = sum(sRes)
