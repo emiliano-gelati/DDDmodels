@@ -121,7 +121,7 @@ function calibrateMultipleCatchments(path_toml::String)
         dir_out_cal = mkpath(joinpath(dir_out, "calibrated"))
         dir_log_cal = mkpath(joinpath(dir_out_cal, "log"))
         template_path_r2 = joinpath(dir_log_cal, "r2.csv")
-        evaluator = makeEvaluator(parameters_all, paths_ptq["calibration"], settings.spinup, template_path_r2)
+        evaluator = makeEvaluator(parameters.all, paths_ptq["calibration"], settings.spinup, template_path_r2)
         print("\tCalibration started on ", Dates.format(now(), "yyyy-mm-dd HH:MM"))
         res = redirect_stdio(stdout=devnull, stderr=devnull) do
             bboptimize(evaluator; SearchRange=bounds_local, MaxSteps=settings.steps_max, TraceMode=:silent, SaveTrace=true, NThreads=num_threads)
