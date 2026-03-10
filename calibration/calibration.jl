@@ -129,7 +129,7 @@ function calibrateMultipleCatchments(path_toml::String)
         print(" and ended after ", canonicalize(Second(Int(round(res.elapsed_time)))))
         println(" -> KGE: ", round(1 - best_fitness(res), digits=4))
         ## Write calibrated parameters to file
-        setHydrologicParameters(parameters, best_candidate(res))
+        setHydrologicParameters!(parameters, best_candidate(res))
         CSV.write(joinpath(dir_out_cal, "parameters.csv"), parameters.all, delim=';', writeheader=false)
         ## Merge calibration log files (1 r2fil per thread): TO DO (function in DDDAll... to rename r2fil and reuse it here)!
         ## Run DDD with calibrated parameters
