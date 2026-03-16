@@ -22,19 +22,21 @@ Random.seed!(0)
 end
 
 mutable struct ParameterSet
-    positions_hyd::Vector{UInt8}
-    all::DataFrame
-    hydrologic::Vector{Float64}
+    positions::Vector{UInt8}
+    values::DataFrame
     function ParameterSet(path_in::String)
-        positions_hyd::Vector{UInt8} = [20, 21, 22, 18, 19, 33, 34, 35, 36, 37]
-        params_all = CSV.read(path_in, DataFrame, header=["Name", "val"], delim=';')
-        hydrologic::Vector{Float64} = [params_all[i,"val"] for i in positions_hyd]
-        new(positions_hyd, params_all, hydrologic)
+        positions::Vector{UInt8} = [20, 21, 22, 18, 19, 33, 34, 35, 36, 37]
+        values = CSV.read(path_in, DataFrame, header=["Name", "val"], delim=';')
+        new(positions, values)
     end
 end
 
+function getHydrologicParameters(parameters::ParameterSet)::Vector{Float64}
+    [parameters.values[i,"val"] for i in parameters.positions]
+end
+
 function setHydrologicParameters!(parameters::ParameterSet, hydrologic::Vector{Float64})
-    parameters.all[parameters.positions_hyd,"val"] .= hydrologic
+    parameters.values[parameters.positions,"val"] .= hydrologic
 end
 
 function pathsPTQ(id::String, settings::SettingsCalibration)
@@ -109,7 +111,7 @@ function calibrateMultipleCatchments(path_toml::String)
         path_inipar = replace(settings.template_path_inipar, "<CATCHMENT>" => id)
         parameters = ParameterSet(path_inipar)
         dir_out_ini = mkpath(joinpath(dir_out, "initial"))
-        runDDD(paths_ptq, parameters.hydrologic, parameters.all, settings.spinup, dir_out_ini, "initial parameters")
+        runDDD(paths_ptq, getHydrologicParameters(parameters), parameters.values, settings.spinup, dir_out_ini, "initial parameters")
         ## Modify parameter bounds if specified for catchment (NOT IMPLEMENTED YET)
         if haskey(bounds_all, id)
             error("Not implemented yet: parameter ranges for individual catchments")
@@ -121,7 +123,7 @@ function calibrateMultipleCatchments(path_toml::String)
         dir_out_cal = mkpath(joinpath(dir_out, "calibrated"))
         dir_log_cal = mkpath(joinpath(dir_out_cal, "log"))
         template_path_r2 = joinpath(dir_log_cal, "r2.csv")
-        evaluator = makeEvaluator(parameters.all, paths_ptq["calibration"], settings.spinup, template_path_r2)
+        evaluator = makeEvaluator(parameters.values, paths_ptq["calibration"], settings.spinup, template_path_r2)
         print("\tCalibration started on ", Dates.format(now(), "yyyy-mm-dd HH:MM"))
         res = redirect_stdio(stdout=devnull, stderr=devnull) do
             bboptimize(evaluator; SearchRange=bounds_local, MaxSteps=settings.steps_max, TraceMode=:silent, SaveTrace=true, NThreads=num_threads)
@@ -130,10 +132,10 @@ function calibrateMultipleCatchments(path_toml::String)
         println(" -> KGE: ", round(1 - best_fitness(res), digits=4))
         ## Write calibrated parameters to file
         setHydrologicParameters!(parameters, best_candidate(res))
-        CSV.write(joinpath(dir_out_cal, "parameters.csv"), parameters.all, delim=';', writeheader=false)
+        CSV.write(joinpath(dir_out_cal, "parameters.csv"), parameters.values, delim=';', writeheader=false)
         ## Merge calibration log files (1 r2fil per thread): TO DO (function in DDDAll... to rename r2fil and reuse it here)!
         ## Run DDD with calibrated parameters
-        runDDD(paths_ptq, parameters.hydrologic, parameters.all, settings.spinup, dir_out_cal, "calibrated parameters")
+        runDDD(paths_ptq, getHydrologicParameters(parameters), parameters.values, settings.spinup, dir_out_cal, "calibrated parameters")
         ## Create empty file ("done") to be used in case of restart to skip this catchment
         touch(pathDone(id, settings))
     end
@@ -153,5 +155,5 @@ function runSingleCatchment(path_toml::String, id::String, period::String)
     path_out_r2 = joinpath(dir_out, "r2_$(id)_$(period).csv")
     println("Output in ", dir_out)
     # Run DDD
-    DDDAllTerrain(fill(NaN, 2), 1, parameters.hydrologic, parameters.all, path_ptq, path_out_series, path_out_r2, 0, 0, 0, settings.spinup, true)
+    DDDAllTerrain(fill(NaN, 2), 1, getHydrologicParameters(parameters), parameters.values, path_ptq, path_out_series, path_out_r2, 0, 0, 0, settings.spinup, true)
 end

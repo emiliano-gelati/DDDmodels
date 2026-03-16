@@ -11,7 +11,7 @@ path_out_series = joinpath(dir_out, "output_series_12.70.csv")
 path_out_r2 = joinpath(dir_out, "output_r2_12.70.csv")
 # Run model
 println("Test output in ", dir_out)
-DDDAllTerrain(fill(NaN, 2), 1, parameters.hydrologic, parameters.all, path_ptq, path_out_series, path_out_r2, 0, 0, 0, 365, true)
+DDDAllTerrain(fill(NaN, 2), 1, getHydrologicParameters(parameters), parameters.values, path_ptq, path_out_series, path_out_r2, 0, 0, 0, 365, true)
 # Load output  and benchmark time series
 output = CSV.read(path_out_series, DataFrame)
 benchmark = CSV.read(joinpath(dir_data, "benchmark_series_12.70.csv"), DataFrame)
