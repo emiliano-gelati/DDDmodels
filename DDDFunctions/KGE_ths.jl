@@ -13,6 +13,7 @@ function kge(q_sim, q_obs)
     if all(isnan, q_sim) || all(isnan, q_obs)
 
         kge = NaN
+        beta = NaN
 
     else
 
@@ -29,8 +30,8 @@ function kge(q_sim, q_obs)
 
         kge = 1 - sqrt( (r-1)^2 + (beta-1)^2 + (gamma-1)^2 )
 
-        println("KGE: ", kge)  # Print KGE for verification
-        println("Beta(bias): ", beta)  # Print KGE for verification
+#        println("KGE: ", kge)  # Print KGE for verification
+#        println("Beta(bias): ", beta)  # Print KGE for verification
     end
 
     return kge, beta

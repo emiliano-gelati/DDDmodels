@@ -27,10 +27,65 @@
 # Running DDD:    It is possible to save model state variables and run the model
 #                 starting from saved state variables
 #----------------------------------------------------------------------------------
+import Base.Threads: nthreads, threadid
+using CSV
+using DataFrames
+using Distributions
+using LsqFit
+using Statistics
+using Dates
+using JLD2
+# Preprocessing routines
+include("Big2SmallLambda.jl")
+include("CeleritySubSurface.jl")
+include("SingleUH.jl")
+include("SingleNormalUH.jl")
+include("LayerEstimation.jl")
+include("PyrAreas.jl")
+include("GrWPoint.jl")
+include("RiverPoint.jl")
+include("TemperatureVector.jl")
+# EB and Snow Routines
+include("NedbEBGlac_debug04072022.jl")
+include("SnowpackTemp.jl")
+include("TempstartUpdate.jl")
+include("SmeltEBGlac_debug04072022.jl")
+include("CloudCoverGlac_debug04072022.jl")
+include("TssDewpoint.jl")
+include("SolradTransAlbedoper_hrs_debug04072022.jl")
+include("LongWaveRad_debug04072022.jl")
+include("SensibleLatHeat_debug04072022.jl")
+include("AlbedoUEB_debug04072022.jl")
+include("GroundPrecCC.jl")
+include("SnowGamma.jl")
+include("Varc.jl")
+include("NewSnowDensityEB.jl")
+include("NewSnowSDEB.jl")
+include("DensityAge.jl")
+# Subsurface and Evaporation routines
+include("LayerCapacityUpdate.jl")
+include("PotentialEvapPT.jl")
+include("UnsaturatedEvapEB.jl")
+include("LayerEvap.jl")
+include("UnsaturatedExEvap.jl")
+include("WetlandsEB.jl")
+include("GrvInputDistributionICap2022.jl")
+include("OFICap.jl")
+include("LayerUpdate.jl")
+include("BogLayerUpdate.jl")
+include("RiverUpdate.jl")
+# Overland Flow routine
+include("OverlandFlowDynamicDD.jl")
+# Efficiency criteria
+include("NSE_ths.jl")
+include("KGE_ths.jl")
 
-function DDDAllTerrain(Gpar, startsim, tprm, prm ,ptqfile,utfile,r2fil, modstate,savestate, kal, spinuptime)
 
 
+function DDDAllTerrain(Gpar::Vector{Float64}, startsim::Int, tprm::Vector{Float64}, prm::DataFrame, ptqfile::String, utfile::String,
+                       r2fil::String, modstate::Int, savestate::Int, kal::Int, spinuptime::Int, silent::Bool=false)
+
+# TO DO: remove Gpar argument which is not used
 DDA = 6  # number of landscape types with distance distribution
 # DDA=1 Permeable (P) areas
 # DDA=2 ImPermeable (IP) areas
@@ -225,7 +280,7 @@ MAD2 = exp(-4.59 + 1.135*log(meandailyP)+0.97*log(totarea/1000000)-0.0603*meanda
 if (Ltyfrac[5] > 0.05 ) #Fraction of glaciers
      MAD = MAD2    # needs to adjust MAD if glaciers are present since MAD is used to estimate the groundwater reservoir
 end 
-println("Mad= ", MAD)
+!silent && println("Mad= ", MAD)
 
 #Constants
 hson = 10                               # Elevation zones
@@ -515,7 +570,7 @@ for i in startsim:days
 	    if(kal == 1)
           spd[idim]  = 8000.0
 	      skorr= 0.9*skorr
-          println("Skorr is reduced, you build snowtowers = trend in SWE")
+          !silent && println("Skorr is reduced, you build snowtowers = trend in SWE")
 	    end 
       end
       
@@ -868,8 +923,8 @@ end
 
 end # end of loop for number of timesteps in timeseries
  
-println("nodaysLake=",nodaysLake)
-println("nodaysRiver=",nodaysRiv)
+!silent && println("nodaysLake=",nodaysLake)
+!silent && println("nodaysRiver=",nodaysRiv)
 
  skillstart = Int(spinuptime*(86400/Timeresinsec))
  days2 = days
@@ -883,27 +938,27 @@ wwater = 1.0*persons*(140.0 + 42.0)/(86400.0*1000.0)# norsk vann equivalent use 
  KGE, beta = (kge((wwater .+ qberegn[skillstart:days2]),ptqinn.q[skillstart:days2]))
  NSE = (nse((wwater .+ qberegn[skillstart:days2]),ptqinn.q[skillstart:days2]))
  bias = beta #(meansim/meanobs)
-#bias = (meansim/meanobs) 
+#bias = (meansim/meanobs)
 
-#Recall, tprm is the parameter vector
-#                                       u,        pro,        TX,      PCritFlux,         OFP,        GshInt,   GscInt, persons
-dfy = DataFrame(A=NSE,B=KGE,C=bias,D=tprm[1],E=tprm[2],F=tprm[3],G=tprm[4], H=tprm[5], II =tprm[6],IJ=tprm[7],
-    JJ=tprm[8], KJ= tprm[9], LJ= tprm[10])
-CSV.write(r2fil,DataFrame(dfy), delim = ';', header=false, append = true)
-
-
-toptitles = ["Yr","Mnt","Day", "Hr","Min","Precip","Temp","Qobs","Qsim","Q_P","Q_IP","Q_Bogs","SCA_P","SWE_P","SS+_P", "SS+_IP","SSDef_P","SSDef_IP",
-        "SM_P","SM_IP","Ea_P","Ea_IP","Qmm","SMBog","EaBog","qmm_state","Boglyrs","SCA_IP", "SWE_IP","WCS_P", "WCS_IP","SS_P", "SS_IP",
-        "Q_OF", "outglac", "r_sm_outglac", "gisoil", "misoil","snittT[1]"]
+ #Recall, tprm is the parameter vector
+ #                                       u,        pro,        TX,      PCritFlux,         OFP,        GshInt,   GscInt, persons
+ dfy = DataFrame(A=NSE,B=KGE,C=bias,D=tprm[1],E=tprm[2],F=tprm[3],G=tprm[4], H=tprm[5], II =tprm[6],IJ=tprm[7],
+     JJ=tprm[8], KJ= tprm[9], LJ= tprm[10])
+ # if calibrating and multithreading, create a r2 file per thread and thus avoid simultaneous writing to the same file
+ path_r2 = kal == 1 && nthreads() > 1 ? replace(r2fil, ".csv" => "_$(lpad(threadid(), 3, '0')).csv") : r2fil
+ CSV.write(path_r2, dfy, delim = ';', header=false, append = true)
 
  if (kal==0)
+  toptitles = ["Yr","Mnt","Day", "Hr","Min","Precip","Temp","Qobs","Qsim","Q_P","Q_IP","Q_Bogs","SCA_P","SWE_P","SS+_P", "SS+_IP","SSDef_P","SSDef_IP",
+          "SM_P","SM_IP","Ea_P","Ea_IP","Qmm","SMBog","EaBog","qmm_state","Boglyrs","SCA_IP", "SWE_IP","WCS_P", "WCS_IP","SS_P", "SS_IP",
+          "Q_OF", "outglac", "r_sm_outglac", "gisoil", "misoil","snittT[1]"]
   CSV.write(utfile,DataFrame(simresult,:auto), delim = ';', header=toptitles)                
-  println("M= ", round(M[1],digits=2)," ",round(M[2],digits =2))
-  println("k_P= ", round(k[1,1],digits=6)," ",round(k[1,2],digits=6)," ",round(k[1,3],digits=6)," ",round(k[1,4],digits=6)," ",round(k[1,5],digits=6))
+  !silent && println("M= ", round(M[1],digits=2)," ",round(M[2],digits =2))
+  !silent && println("k_P= ", round(k[1,1],digits=6)," ",round(k[1,2],digits=6)," ",round(k[1,3],digits=6)," ",round(k[1,4],digits=6)," ",round(k[1,5],digits=6))
   if (area[2] >0.0)
-   println("k_IP= ", round(k[2,1],digits=6)," ",round(k[2,2],digits=6)," ",round(k[2,3],digits=6)," ",round(k[2,4],digits=6)," ",round(k[2,5],digits=6))
+   !silent && println("k_IP= ", round(k[2,1],digits=6)," ",round(k[2,2],digits=6)," ",round(k[2,3],digits=6)," ",round(k[2,4],digits=6)," ",round(k[2,5],digits=6))
   end
-  println("Mean(Qsim)= ",meansim)
+  !silent && println("Mean(Qsim)= ",meansim)
  end           
 
 return ptqinn.q, qberegn, KGE,NSE,bias
