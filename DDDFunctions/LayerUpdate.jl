@@ -8,6 +8,7 @@
 #--------------------------------------------------------------------------
 
 function LayerUpdate!(ddist::Vector{Float64}, outx::Float64, Layers::Matrix{Float64}, layerUH::Matrix{Float64}, nodaysvector::Vector{Int}, NoL::Int)
+
   for j in 1:NoL
     multiplier = ddist[j] * outx
     Layers[j,1] = multiplier * layerUH[j,1]
