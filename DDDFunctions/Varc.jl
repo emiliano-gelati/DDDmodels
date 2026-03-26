@@ -90,7 +90,7 @@ end #for u > 0.0 END ABLATION
        nudyn = (meantot^2/vartot)
        alphadyn = meantot/vartot  # Conditional distribution
       end
-      if(vartot =="NaN")
+      if isnan(vartot)
        println("vartot=NaN (ny_varc) nudyn= ",nudyn," alphadyn= ",alphadyn, " meantot= ", meantot," vartot= ",vartot," nnn= ",nnn," n= ",n," u= ",u)
        sleep(5) #stops for 5 seconds
       end

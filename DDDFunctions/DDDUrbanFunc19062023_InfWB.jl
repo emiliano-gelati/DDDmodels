@@ -574,14 +574,14 @@ for i in startsim:days
   #Updating the saturation Layers
     for Lst in 1:Lty
       if(Lst==1)
-         LayersP = LayerUpdate(ddist[Lst,1:NoL],outx[Lst], LayersP, layerUH_P, nodaysvector[Lst,1:NoL], NoL)
+         LayerUpdate!(ddist[Lst,1:NoL],outx[Lst], LayersP, layerUH_P, nodaysvector[Lst,1:NoL], NoL)
     end       
       if(Lst==2)
-        LayersIP = LayerUpdate(ddist[Lst,1:NoL],outx[Lst], LayersIP, layerUH_IP, nodaysvector[Lst,1:NoL], NoL)       
+         LayerUpdate!(ddist[Lst,1:NoL],outx[Lst], LayersIP, layerUH_IP, nodaysvector[Lst,1:NoL], NoL)       
       end
     end  
 
-  BogLayers = BogLayerUpdate(outbog, BogLayers, UHbog, antBogsteps)#
+  BogLayerUpdate!(outbog, BogLayers, UHbog, antBogsteps)#
    
   #summing up groundwater states
     for Lst in 1:Lty

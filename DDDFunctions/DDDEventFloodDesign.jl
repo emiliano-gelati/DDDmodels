@@ -390,10 +390,10 @@ for i in 1:days2 #Length of precip timeseries +5 (recession)
   #Updating the saturation Layers. The "boxes are shifted on step ahead"
     for Lst in 1:Lty
       if(Lst==1)
-         LayersP = LayerUpdate(ddist[Lst,1:NoL],outx[Lst], LayersP, layerUH_P, nodaysvector[Lst,1:NoL], NoL)
+         LayerUpdate!(ddist[Lst,1:NoL],outx[Lst], LayersP, layerUH_P, nodaysvector[Lst,1:NoL], NoL)
     end       
       if(Lst==2)
-        LayersIP = LayerUpdate(ddist[Lst,1:NoL],outx[Lst], LayersIP, layerUH_IP, nodaysvector[Lst,1:NoL], NoL)       
+         LayerUpdate!(ddist[Lst,1:NoL],outx[Lst], LayersIP, layerUH_IP, nodaysvector[Lst,1:NoL], NoL)       
       end
     end  
    

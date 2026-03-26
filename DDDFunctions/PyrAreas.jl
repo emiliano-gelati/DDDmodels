@@ -32,8 +32,7 @@ function PyrAreas(NoL,totarea,maxDl,nodaysvector, layerUH, antHorlag)
        Areas[i,j] = totarea.*layerUH[i,j] 
     end
   end
-  delta_d = zeros(NoL)                            # in meters (height as in the pyramid plots) pr. time-step box
-  delta_d[1:NoL] = maxDl ./nodaysvector[1:NoL]  
+  delta_d = maxDl ./ nodaysvector  # in meters (height as in the pyramid plots) pr. time-step box
   
 
 #To be used in GRW_point subroutne: Layers__mm <- Layers*totarea/areas ######################

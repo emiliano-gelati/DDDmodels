@@ -44,7 +44,6 @@ include("LayerEstimation.jl")
 include("PyrAreas.jl")
 include("GrWPoint.jl")
 include("RiverPoint.jl")
-include("TemperatureVector.jl")
 # EB and Snow Routines
 include("NedbEBGlac_debug04072022.jl")
 include("SnowpackTemp.jl")
@@ -171,8 +170,6 @@ snofritt = zeros(Lty)
 wcs = zeros(Lty)
 GIsoil = zeros(Lty)  # mean glacial melt 
 scaobx = zeros(10)
-hprecip = zeros(10)
-htemp = zeros(10)
 hfelt = zeros(10)
 
 ########################Reading parameters#########################################################
@@ -291,9 +288,7 @@ CFR = 2.5*(Timeresinsec/86400)*0.0833   # Fixed as 1/12 of estimate of CX= 2.5 f
 len = Int(5*(86400/Timeresinsec))       # number of timestepes to spin up the model. Recommended to use timesteps equal to a minimum of 5 days to estimate the snowpack temperature.)
 
 startsim = startsim + len               # taking into account estimating snowpack temperature
-tempstart = zeros(len,10)               # matrix for storing temperatures when starting from states
-tempstart = ptqinn[(startsim-len+1):startsim,16:25]  # assigning temperature values
-STempvec = zeros(len)              # Temperature vector for estimating snowpack temperature
+tempstart = Matrix{Float64}(ptqinn[(startsim-len+1):startsim,16:25])  # matrix for storing temperatures when starting from states
 
 Pa[1:10] = 101.3*((293 .- 0.0065.*hfelt[1:10])/293.0).^5.26     # Air pressure as a function of height Zhu et al. 2012 and Stoy et al, 2018
 MPa = mean(Pa)
@@ -507,19 +502,18 @@ for i in startsim:days
   DN = Dates.dayofyear(dato)           #daynumber        
   
   #Reads Precipitation and temperature for each elevation zone   
-  htemp = ptqinn[i,16:25]
-  hprecip = ptqinn[i,6:15] 
+  htemp = Vector{Float64}(ptqinn[i,16:25])
+  hprecip = Vector{Float64}(ptqinn[i,6:15])
 
   meanprecip = mean(hprecip)
   meantemp =  mean(htemp)
-  tempstart = TempstartUpdate(tempstart,htemp, len) #Updating the tempstart with this timesteps temperature 
+  TempstartUpdate!(tempstart,htemp, len) #Updating the tempstart with this timesteps temperature 
  
   for Lst in 1:Lty     # landscape types, one snow regime for each landscape type P and IP. The other Lty have no snow
 
     for idim in 1:hson # elevation zones  
 
-      #STempvec = TemperatureVector(ptqinn[(i-len+1):i,16:25],idim, len) # i is always greater than len
-      STempvec = TemperatureVector(tempstart, idim, len)
+      @views STempvec = reverse(tempstart[:,idim]) # Temperature vector for estimating snowpack temperatur
       CGLAC = 0.0 # dummy, has no role in this version, energy balance is used
       CX = 0.0    # dummy, has no role in this version, energy balance is used
       TS = 0.0    # dummy, has no role in this version, energy balance is used
@@ -776,14 +770,14 @@ for i in startsim:days
   #Updating the saturation Layers
     for Lst in 1:Lty
       if(Lst==1)
-         LayersP = LayerUpdate(ddist[Lst,1:NoL],outx[Lst], LayersP, layerUH_P, nodaysvector[Lst,1:NoL], NoL)
+         LayerUpdate!(ddist[Lst,1:NoL],outx[Lst], LayersP, layerUH_P, nodaysvector[Lst,1:NoL], NoL)
     end       
       if(Lst==2)
-        LayersIP = LayerUpdate(ddist[Lst,1:NoL],outx[Lst], LayersIP, layerUH_IP, nodaysvector[Lst,1:NoL], NoL)       
+        LayerUpdate!(ddist[Lst,1:NoL],outx[Lst], LayersIP, layerUH_IP, nodaysvector[Lst,1:NoL], NoL)       
       end
     end  
 
-  BogLayers = BogLayerUpdate(outbog, BogLayers, UHbog, antBogsteps)#
+  BogLayerUpdate!(outbog, BogLayers, UHbog, antBogsteps)#
    
   #summing up groundwater states
     for Lst in 1:Lty
@@ -858,20 +852,20 @@ for i in startsim:days
   #Qmm = (QRD*Timeresinsec*1000/totarea)  #QRD in mm/day
   #Routing the contributions in the Lake
   Qm3s = LakeLayers[1] + QRD*UHLake[1]            #Lakewater to be discharged from outlet + this timesteps contribution, i.e. catchment response in m3/s
-  LakeLayers = BogLayerUpdate(QRD, LakeLayers, UHLake, nodaysLake) # Same routine updating as for Bogs
+  BogLayerUpdate!(QRD, LakeLayers, UHLake, nodaysLake) # Same routine updating as for Bogs
   Qmm = (Qm3s*Timeresinsec*1000/totarea)  #GDT_Lake in mm/Timeresinsec
 
   P_Qm3s = P_LakeLayers[1] + QRDP*UHLake[1]            #Lakewater to be discharged from outlet + this timesteps contribution, i.e. catchemnt response 
-  P_LakeLayers = BogLayerUpdate(QRDP, P_LakeLayers, UHLake, nodaysLake) # Same routine updating as for Bogs
+  BogLayerUpdate!(QRDP, P_LakeLayers, UHLake, nodaysLake) # Same routine updating as for Bogs
   
   IP_Qm3s = IP_LakeLayers[1] + QRDIP*UHLake[1]            #Lakewater to be discharged from outlet + this timesteps contribution, i.e. catchemnt response 
-  IP_LakeLayers = BogLayerUpdate(QRDIP, IP_LakeLayers, UHLake, nodaysLake) # Same routine updating as for Bogs
+  BogLayerUpdate!(QRDIP, IP_LakeLayers, UHLake, nodaysLake) # Same routine updating as for Bogs
   
   Bog_Qm3s = Bog_LakeLayers[1] + QRDBog*UHLake[1]            #Lakewater to be discharged from outlet + this timesteps contribution, i.e. catchemnt response 
-  Bog_LakeLayers = BogLayerUpdate(QRDBog, Bog_LakeLayers, UHLake, nodaysLake) # Same routine updating as for Bogs
+  BogLayerUpdate!(QRDBog, Bog_LakeLayers, UHLake, nodaysLake) # Same routine updating as for Bogs
   
   OF_Qm3s = OF_LakeLayers[1] + QRDOF*UHLake[1]            #not a contribution, just sttratifying the runoff 
-  OF_LakeLayers = BogLayerUpdate(QRDOF, OF_LakeLayers, UHLake, nodaysLake) # Same routine updating as for Bogs
+  BogLayerUpdate!(QRDOF, OF_LakeLayers, UHLake, nodaysLake) # Same routine updating as for Bogs
    
    #WBP = (SPinn + RinnP) - (lyrs[1] + sum(QRivxP)*(Timeresinsec*1000/area[1]))    #mm  last term inludes discharge and storage in rivernetwork                                         
    #println("WBP = ", WBP, " Total inn P= ",SPinn)                                             
@@ -909,7 +903,7 @@ for i in startsim:days
 #---------------------------------------------------------------------------------------------------
 
 # Updating the  temperature matrix for estimating snowpack temperature
- tempstart = ptqinn[(i-len+1):i,16:25]  # assigning temperature values, i is always larger than len
+ tempstart = Matrix{Float64}(ptqinn[(i-len+1):i,16:25])  # assigning temperature values, i is always larger than len
 
 # Saving states, SWE, sm, Layers, etc in a JLD2 file
 if(i == (38165 + len) && savestate == 1) #  This number is ONE timestep less than startsim, i.e. the statefile is for the timestep before startsim 
